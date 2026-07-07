@@ -1,0 +1,128 @@
+'use client';
+
+import React from 'react';
+import { useGameStore } from '@/store/game-store';
+import { ITEMS } from '@/lib/game/items';
+import { EquipSlot, ItemType } from '@/lib/game/types';
+
+export default function GameHUD() {
+  const player = useGameStore((s) => s.player);
+
+  if (!player) return null;
+
+  const { stats } = player;
+  const hpPercent = (stats.health / stats.maxHealth) * 100;
+  const mpPercent = (stats.mana / stats.maxMana) * 100;
+  const xpPercent = (stats.experience / stats.experienceToNext) * 100;
+
+  // Calculate total attack/defense with equipment
+  let totalAttack = stats.attack;
+  let totalDefense = stats.defense;
+  let totalMagicAtk = stats.magicAttack;
+  let totalMagicDef = stats.magicDefense;
+
+  for (const slot of Object.values(EquipSlot)) {
+    const itemId = player.equipment[slot];
+    if (itemId) {
+      const item = ITEMS[itemId];
+      if (item) {
+        if (item.attack) totalAttack += item.attack;
+        if (item.defense) totalDefense += item.defense;
+        if (item.magicAttack) totalMagicAtk += item.magicAttack;
+        if (item.magicDefense) totalMagicDef += item.magicDefense;
+      }
+    }
+  }
+
+  return (
+    <div className="absolute top-0 left-0 right-0 pointer-events-none z-10">
+      {/* Top bar - Character Info */}
+      <div className="flex items-start justify-between p-2 gap-2">
+        {/* Character panel */}
+        <div className="bg-black/80 border border-amber-700/50 rounded-lg p-2 pointer-events-auto min-w-[200px]">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded bg-amber-700 flex items-center justify-center text-white text-sm font-bold">
+              {player.vocation[0]}
+            </div>
+            <div>
+              <div className="text-amber-400 font-bold text-sm leading-tight">{player.name}</div>
+              <div className="text-amber-200/60 text-xs">
+                {player.vocation} • Level {stats.level}
+              </div>
+            </div>
+          </div>
+
+          {/* HP Bar */}
+          <div className="mb-1">
+            <div className="flex justify-between text-xs mb-0.5">
+              <span className="text-red-400">❤️ HP</span>
+              <span className="text-gray-400">{Math.floor(stats.health)}/{stats.maxHealth}</span>
+            </div>
+            <div className="h-3 bg-gray-800 rounded-full overflow-hidden border border-red-900/50">
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{
+                  width: `${hpPercent}%`,
+                  background: hpPercent > 50
+                    ? 'linear-gradient(to right, #27ae60, #2ecc71)'
+                    : hpPercent > 25
+                    ? 'linear-gradient(to right, #e67e22, #f39c12)'
+                    : 'linear-gradient(to right, #c0392b, #e74c3c)',
+                }}
+              />
+            </div>
+          </div>
+
+          {/* MP Bar */}
+          <div className="mb-1">
+            <div className="flex justify-between text-xs mb-0.5">
+              <span className="text-blue-400">🔵 MP</span>
+              <span className="text-gray-400">{Math.floor(stats.mana)}/{stats.maxMana}</span>
+            </div>
+            <div className="h-3 bg-gray-800 rounded-full overflow-hidden border border-blue-900/50">
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{
+                  width: `${mpPercent}%`,
+                  background: 'linear-gradient(to right, #2980b9, #3498db)',
+                }}
+              />
+            </div>
+          </div>
+
+          {/* XP Bar */}
+          <div>
+            <div className="flex justify-between text-xs mb-0.5">
+              <span className="text-yellow-400">⭐ XP</span>
+              <span className="text-gray-400">{stats.experience}/{stats.experienceToNext}</span>
+            </div>
+            <div className="h-2 bg-gray-800 rounded-full overflow-hidden border border-yellow-900/50">
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{
+                  width: `${xpPercent}%`,
+                  background: 'linear-gradient(to right, #f39c12, #f1c40f)',
+                }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="bg-black/80 border border-amber-700/50 rounded-lg p-2 pointer-events-auto text-xs">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-gray-300">
+            <div>⚔️ Atk: <span className="text-orange-400 font-bold">{totalAttack}</span></div>
+            <div>🛡️ Def: <span className="text-gray-200 font-bold">{totalDefense}</span></div>
+            <div>🔮 Mag: <span className="text-purple-400 font-bold">{totalMagicAtk}</span></div>
+            <div>✨ Mdf: <span className="text-blue-400 font-bold">{totalMagicDef}</span></div>
+          </div>
+        </div>
+
+        {/* Gold display */}
+        <div className="bg-black/80 border border-amber-700/50 rounded-lg px-3 py-2 pointer-events-auto">
+          <div className="text-yellow-400 font-bold text-sm">🪙 {player.gold}</div>
+        </div>
+      </div>
+    </div>
+  );
+}

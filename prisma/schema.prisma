@@ -1,0 +1,34 @@
+// This is your Prisma schema file,
+// learn more at it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Player {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  vocation     String
+  level        Int      @default(1)
+  experience   Int      @default(0)
+  health       Int      @default(100)
+  maxHealth    Int      @default(100)
+  mana         Int      @default(50)
+  maxMana      Int      @default(50)
+  attack       Int      @default(10)
+  defense      Int      @default(5)
+  magicAttack  Int      @default(2)
+  magicDefense Int      @default(2)
+  positionX    Int      @default(50)
+  positionY    Int      @default(47)
+  gold         Int      @default(0)
+  equipment    String   @default("{}")
+  inventory    String   @default("[]")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
