@@ -60,3 +60,57 @@ Stage Summary:
 - Minimap, inventário com tooltips, HUD completo
 - Servidor multiplayer via socket.io (porta 3004)
 - Zero erros de runtime verificados via Agent Browser
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Implementar sistema de combate visual com animações de espada e efeitos de magia
+
+Work Log:
+- Adicionou tipo SpellEffect em types.ts com 8 tipos de efeito visual (sword_slash, projectile, explosion, heal_aura, whirlwind, lightning, earthquake, war_cry)
+- Adicionou DIR_OFFSETS exportado em types.ts para referências de direção
+- Criou src/lib/game/skills.ts com definições compartilhadas de 12 habilidades e função getSkillEffectType()
+- Atualizou game-store.ts com:
+  - spellEffects state, skillCooldowns, buffEndTime
+  - addSpellEffect(), cleanupSpellEffects(), castSkill() actions
+  - Animação de sword_slash ao atacar (mesmo sem alvo)
+  - Cor do slash muda para vermelho em críticos
+  - Sistema completo de castSkill com targeting inteligente (melee: adjacente, ranged: na direção do jogador)
+  - Dano de skills escala com MagicAttack + base damage
+  - Buff War Cry dá 30% bônus de ataque por 10s
+  - Loot, XP e level-up funcionam com kills por skill
+- Reescreveu GameCanvas.tsx com:
+  - Sistema completo de renderização de efeitos visuais (renderSpellEffects)
+  - Animação de arco de espada (sword_slash) com trail e glow
+  - Projéteis animados (fireball, energy beam) com trail e explosão no impacto
+  - Explosão com anel expansivo e partículas
+  - Aura de cura com partículas verdes subindo e cruz
+  - Whirlwind com arcos giratórios
+  - Lightning com linha zigzag e flash de impacto
+  - Earthquake com ondas de choque e rachaduras
+  - War Cry com ondas sonoras e texto "ATK UP!"
+  - Espada visível na mão do personagem (desenhada no sprite)
+  - Aura laranja pulsante quando buff de War Cry está ativo
+  - Hotkeys corrigidos: F1-F4 = skills, 1-9 = itens, Space = ataque
+- Reescreveu SkillsPanel.tsx:
+  - Importa definições de src/lib/game/skills.ts (sem dependência circular)
+  - Botão de "Basic Attack" (⚔️ SPC) sempre visível no skill bar
+  - Indicadores de hotkey F1-F4 em cada skill
+  - Cooldown visual com sweep circular (SVG)
+  - Barra de mana no fundo (azul = tem mana, vermelho = sem mana)
+  - Tooltip melhorado com range, escala de dano, hotkey
+  - Indicador de buff "⚔️ ATK+" pulsante quando ativo
+  - Re-render automático a cada 200ms para atualizar cooldowns
+- Atualizou controles em page.tsx: "WASD: Move | Space/Click: Attack | F1-F4: Skills | 1-9: Items | E: NPC | I: Inv"
+- Mensagem de boas-vindas atualizada com novos controles
+
+Stage Summary:
+- Sistema de combate visual completo com 8 tipos de efeitos animados no Canvas
+- Ataque com espada (Space/Click) mostra animação de arco slash
+- F1-F4 dispara magias com projéteis, explosões, raios, etc.
+- 1-9 continua sendo usado para itens do inventário (sem conflito)
+- Hotkeys: Space=Ataque, F1-F4=Skills, 1-9=Itens, E=NPC, I=Inventário
+- Skills travadas por nível aparecem esmaecidas e desabilitadas
+- Cooldowns visuais com sweep circular
+- Buff visual (aura laranja) quando War Cry está ativo
+- Zero erros verificados no browser (Sorcerer + Druid testados)

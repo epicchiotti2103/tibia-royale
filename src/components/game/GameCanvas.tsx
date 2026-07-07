@@ -8,16 +8,10 @@ import {
   Direction,
   TILE_COLORS,
   DamageNumber,
+  SpellEffect,
+  DIR_OFFSETS,
 } from '@/lib/game/types';
 import { MONSTERS } from '@/lib/game/monsters';
-
-// Direction offsets
-const DIR_OFFSETS = {
-  [Direction.NORTH]: { x: 0, y: -1 },
-  [Direction.EAST]: { x: 1, y: 0 },
-  [Direction.SOUTH]: { x: 0, y: 1 },
-  [Direction.WEST]: { x: -1, y: 0 },
-};
 
 function getDirection(dx: number, dy: number): Direction {
   if (Math.abs(dx) > Math.abs(dy)) {
@@ -26,6 +20,9 @@ function getDirection(dx: number, dy: number): Direction {
   return dy > 0 ? Direction.SOUTH : Direction.NORTH;
 }
 
+// =============================================
+// Tile detail rendering
+// =============================================
 function drawTileDetail(ctx: CanvasRenderingContext2D, tile: TileType, x: number, y: number) {
   const ts = TILE_SIZE;
   switch (tile) {
@@ -135,6 +132,9 @@ function drawTileDetail(ctx: CanvasRenderingContext2D, tile: TileType, x: number
   }
 }
 
+// =============================================
+// Player sprite rendering
+// =============================================
 function drawPlayerSprite(
   ctx: CanvasRenderingContext2D,
   name: string,
@@ -144,11 +144,22 @@ function drawPlayerSprite(
   color: string,
   level: number,
   health: number,
-  maxHealth: number
+  maxHealth: number,
+  hasBuff: boolean
 ) {
   const ts = TILE_SIZE;
   const cx = x + ts / 2;
   const cy = y + ts / 2;
+
+  // Buff aura
+  if (hasBuff) {
+    const time = Date.now() / 300;
+    ctx.strokeStyle = `rgba(255, 165, 0, ${0.3 + Math.sin(time) * 0.2})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 16 + Math.sin(time) * 2, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 
   ctx.fillStyle = 'rgba(0,0,0,0.3)';
   ctx.beginPath();
@@ -178,12 +189,39 @@ function drawPlayerSprite(
     ctx.fillRect(cx - 3, cy - 7, 2, 2);
   }
 
-  ctx.fillStyle = color;
-  const dirOffsets = DIR_OFFSETS[direction];
+  // Weapon (sword) in hand
+  ctx.fillStyle = '#a0a0a0';
+  ctx.strokeStyle = '#707070';
+  ctx.lineWidth = 1;
+  const dirOff = DIR_OFFSETS[direction];
+  const swordX = cx + dirOff.x * 14;
+  const swordY = cy + dirOff.y * 14;
+  ctx.save();
+  ctx.translate(swordX, swordY);
+  const angle = direction === Direction.NORTH ? -Math.PI / 2 : direction === Direction.SOUTH ? Math.PI / 2 : direction === Direction.EAST ? 0 : Math.PI;
+  ctx.rotate(angle);
+  // Sword blade
+  ctx.fillStyle = '#c0c0c0';
+  ctx.fillRect(-1, -12, 3, 12);
+  // Sword tip
   ctx.beginPath();
-  ctx.moveTo(cx + dirOffsets.x * 18, cy + dirOffsets.y * 18);
-  ctx.lineTo(cx + dirOffsets.x * 14 + (dirOffsets.y !== 0 ? -3 : 0), cy + dirOffsets.y * 14 + (dirOffsets.x !== 0 ? -3 : 0));
-  ctx.lineTo(cx + dirOffsets.x * 14 + (dirOffsets.y !== 0 ? 3 : 0), cy + dirOffsets.y * 14 + (dirOffsets.x !== 0 ? 3 : 0));
+  ctx.moveTo(-1, -12);
+  ctx.lineTo(0.5, -16);
+  ctx.lineTo(2, -12);
+  ctx.fill();
+  // Handle
+  ctx.fillStyle = '#8B4513';
+  ctx.fillRect(-2, 0, 5, 4);
+  // Guard
+  ctx.fillStyle = '#DAA520';
+  ctx.fillRect(-3, -1, 7, 2);
+  ctx.restore();
+
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(cx + dirOff.x * 18, cy + dirOff.y * 18);
+  ctx.lineTo(cx + dirOff.x * 14 + (dirOff.y !== 0 ? -3 : 0), cy + dirOff.y * 14 + (dirOff.x !== 0 ? -3 : 0));
+  ctx.lineTo(cx + dirOff.x * 14 + (dirOff.y !== 0 ? 3 : 0), cy + dirOff.y * 14 + (dirOff.x !== 0 ? 3 : 0));
   ctx.fill();
 
   ctx.fillStyle = '#fff';
@@ -212,6 +250,9 @@ function drawPlayerSprite(
   }
 }
 
+// =============================================
+// Monster rendering
+// =============================================
 function drawMonster(
   ctx: CanvasRenderingContext2D,
   name: string,
@@ -265,6 +306,9 @@ function drawMonster(
   ctx.fillRect(barX, barY, barWidth * hpPercent, barHeight);
 }
 
+// =============================================
+// NPC rendering
+// =============================================
 function drawNPC(
   ctx: CanvasRenderingContext2D,
   name: string,
@@ -310,6 +354,9 @@ function drawNPC(
   ctx.fillText('!', cx, y - 18 + bounce);
 }
 
+// =============================================
+// Damage number rendering
+// =============================================
 function renderDamageNumbers(
   ctx: CanvasRenderingContext2D,
   numbers: DamageNumber[],
@@ -359,6 +406,317 @@ function renderDamageNumbers(
   }
 }
 
+// =============================================
+// Spell effect rendering
+// =============================================
+function renderSpellEffects(
+  ctx: CanvasRenderingContext2D,
+  effects: SpellEffect[],
+  camX: number,
+  camY: number
+) {
+  const now = Date.now();
+
+  for (const ef of effects) {
+    const elapsed = now - ef.startTime;
+    const progress = Math.min(1, elapsed / ef.duration);
+    const alpha = 1 - progress;
+
+    const sx = ef.position.x * TILE_SIZE + TILE_SIZE / 2 - camX;
+    const sy = ef.position.y * TILE_SIZE + TILE_SIZE / 2 - camY;
+
+    switch (ef.type) {
+      case 'sword_slash': {
+        // Arc slash animation
+        const dir = ef.direction ?? Direction.SOUTH;
+        const baseAngle = dir === Direction.NORTH ? -Math.PI / 2 : dir === Direction.SOUTH ? Math.PI / 2 : dir === Direction.EAST ? 0 : Math.PI;
+        const swingAngle = baseAngle - 0.8 + progress * 1.6;
+        const radius = 18 + progress * 8;
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = ef.color;
+        ctx.lineWidth = 3;
+        ctx.shadowColor = ef.color;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(sx, sy, radius, swingAngle - 0.8, swingAngle + 0.2);
+        ctx.stroke();
+
+        // Second trail
+        ctx.globalAlpha = alpha * 0.5;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(sx, sy, radius - 4, swingAngle - 0.6, swingAngle);
+        ctx.stroke();
+        ctx.restore();
+        break;
+      }
+
+      case 'projectile': {
+        // Traveling projectile (fireball, energy beam)
+        if (!ef.targetPosition || !ef.direction) break;
+        const tx = ef.targetPosition.x * TILE_SIZE + TILE_SIZE / 2 - camX;
+        const ty = ef.targetPosition.y * TILE_SIZE + TILE_SIZE / 2 - camY;
+
+        const projX = sx + (tx - sx) * progress;
+        const projY = sy + (ty - sy) * progress;
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+
+        // Trail
+        const trailLen = 5;
+        for (let i = 0; i < trailLen; i++) {
+          const t = Math.max(0, progress - i * 0.08);
+          const trailX = sx + (tx - sx) * t;
+          const trailY = sy + (ty - sy) * t;
+          ctx.globalAlpha = alpha * (1 - i / trailLen) * 0.4;
+          ctx.fillStyle = ef.color;
+          ctx.beginPath();
+          ctx.arc(trailX, trailY, 6 - i, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Main projectile
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = ef.color;
+        ctx.shadowColor = ef.color;
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.arc(projX, projY, 7, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Bright center
+        ctx.fillStyle = '#fff';
+        ctx.globalAlpha = alpha * 0.8;
+        ctx.beginPath();
+        ctx.arc(projX, projY, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Explosion on impact
+        if (progress > 0.85) {
+          const expProgress = (progress - 0.85) / 0.15;
+          ctx.globalAlpha = (1 - expProgress) * 0.8;
+          ctx.fillStyle = ef.color;
+          ctx.shadowBlur = 20;
+          ctx.beginPath();
+          ctx.arc(tx, ty, 10 + expProgress * 20, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.restore();
+        break;
+      }
+
+      case 'explosion': {
+        if (!ef.targetPosition) break;
+        const tx = ef.targetPosition.x * TILE_SIZE + TILE_SIZE / 2 - camX;
+        const ty = ef.targetPosition.y * TILE_SIZE + TILE_SIZE / 2 - camY;
+
+        ctx.save();
+        // Expanding ring
+        const radius = 5 + progress * 25;
+        ctx.globalAlpha = alpha * 0.6;
+        ctx.strokeStyle = ef.color;
+        ctx.lineWidth = 3;
+        ctx.shadowColor = ef.color;
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(tx, ty, radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Inner flash
+        ctx.globalAlpha = alpha * 0.4;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(tx, ty, radius * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Particles
+        for (let i = 0; i < 8; i++) {
+          const angle = (i / 8) * Math.PI * 2;
+          const px = tx + Math.cos(angle) * radius * 1.2;
+          const py = ty + Math.sin(angle) * radius * 1.2;
+          ctx.globalAlpha = alpha * 0.7;
+          ctx.fillStyle = ef.color;
+          ctx.beginPath();
+          ctx.arc(px, py, 3 * (1 - progress), 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+        break;
+      }
+
+      case 'heal_aura': {
+        ctx.save();
+        // Green rising particles
+        for (let i = 0; i < 12; i++) {
+          const angle = (i / 12) * Math.PI * 2 + progress * 0.5;
+          const radius = 10 + progress * 15;
+          const px = sx + Math.cos(angle) * radius;
+          const py = sy + Math.sin(angle) * radius - progress * 20;
+          ctx.globalAlpha = alpha * 0.7;
+          ctx.fillStyle = ef.color;
+          ctx.shadowColor = ef.color;
+          ctx.shadowBlur = 6;
+          ctx.beginPath();
+          ctx.arc(px, py, 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Cross healing symbol
+        ctx.globalAlpha = alpha * 0.5;
+        ctx.strokeStyle = '#2ecc71';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy - 8);
+        ctx.lineTo(sx, sy + 8);
+        ctx.moveTo(sx - 8, sy);
+        ctx.lineTo(sx + 8, sy);
+        ctx.stroke();
+        ctx.restore();
+        break;
+      }
+
+      case 'whirlwind': {
+        ctx.save();
+        const spinAngle = progress * Math.PI * 4;
+        const radius = 12 + progress * 20;
+
+        ctx.globalAlpha = alpha * 0.6;
+        ctx.strokeStyle = ef.color;
+        ctx.lineWidth = 3;
+        ctx.shadowColor = ef.color;
+        ctx.shadowBlur = 8;
+
+        // Spinning arcs
+        for (let a = 0; a < 3; a++) {
+          const arcStart = spinAngle + (a * Math.PI * 2) / 3;
+          ctx.beginPath();
+          ctx.arc(sx, sy, radius, arcStart, arcStart + Math.PI * 0.5);
+          ctx.stroke();
+        }
+
+        // Center flash
+        ctx.globalAlpha = alpha * 0.3;
+        ctx.fillStyle = ef.color;
+        ctx.beginPath();
+        ctx.arc(sx, sy, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        break;
+      }
+
+      case 'lightning': {
+        if (!ef.targetPosition) break;
+        const tx = ef.targetPosition.x * TILE_SIZE + TILE_SIZE / 2 - camX;
+        const ty = ef.targetPosition.y * TILE_SIZE + TILE_SIZE / 2 - camY;
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+
+        // Lightning bolt (jagged line)
+        ctx.strokeStyle = '#f1c40f';
+        ctx.lineWidth = 3;
+        ctx.shadowColor = '#f1c40f';
+        ctx.shadowBlur = 15;
+
+        const segments = 6;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy - 20);
+        for (let i = 1; i <= segments; i++) {
+          const t = i / segments;
+          const lx = sx + (tx - sx) * t + (Math.random() - 0.5) * 15 * (1 - Math.abs(t - 0.5) * 2);
+          const ly = sy + (ty - sy) * t + (Math.random() - 0.5) * 15 * (1 - Math.abs(t - 0.5) * 2);
+          ctx.lineTo(lx, ly);
+        }
+        ctx.stroke();
+
+        // Bright core
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Impact flash
+        if (progress > 0.5) {
+          const flashP = (progress - 0.5) / 0.5;
+          ctx.globalAlpha = (1 - flashP) * 0.8;
+          ctx.fillStyle = '#f1c40f';
+          ctx.shadowBlur = 25;
+          ctx.beginPath();
+          ctx.arc(tx, ty, 15 + flashP * 10, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+        break;
+      }
+
+      case 'earthquake': {
+        ctx.save();
+        const radius = 10 + progress * 40;
+        ctx.globalAlpha = alpha * 0.5;
+
+        // Shockwave rings
+        for (let r = 0; r < 3; r++) {
+          const ringRadius = radius * (0.5 + r * 0.3);
+          ctx.strokeStyle = ef.color;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(sx, sy, ringRadius, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        // Ground cracks (lines radiating out)
+        ctx.globalAlpha = alpha * 0.4;
+        ctx.strokeStyle = '#654321';
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 8; i++) {
+          const angle = (i / 8) * Math.PI * 2;
+          const len = radius * (0.5 + Math.random() * 0.5);
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(sx + Math.cos(angle) * len, sy + Math.sin(angle) * len);
+          ctx.stroke();
+        }
+        ctx.restore();
+        break;
+      }
+
+      case 'war_cry': {
+        ctx.save();
+        const radius = 10 + progress * 30;
+
+        // Expanding sound wave rings
+        for (let i = 0; i < 3; i++) {
+          const ringR = radius * (0.6 + i * 0.2);
+          ctx.globalAlpha = alpha * (0.4 - i * 0.1);
+          ctx.strokeStyle = ef.color;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(sx, sy, ringR, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        // "POW" text effect
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = ef.color;
+        ctx.font = `bold ${14 + progress * 6}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = ef.color;
+        ctx.shadowBlur = 10;
+        ctx.fillText('ATK UP!', sx, sy - 20 - progress * 10);
+        ctx.restore();
+        break;
+      }
+    }
+  }
+}
+
+// =============================================
+// Main Game Canvas Component
+// =============================================
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastMoveTime = useRef(0);
@@ -376,6 +734,7 @@ export default function GameCanvas() {
   const interactNPC = useGameStore((s) => s.interactNPC);
   const updateMonsters = useGameStore((s) => s.updateMonsters);
   const cleanupDamageNumbers = useGameStore((s) => s.cleanupDamageNumbers);
+  const cleanupSpellEffects = useGameStore((s) => s.cleanupSpellEffects);
   const regenMana = useGameStore((s) => s.regenMana);
 
   const moveDelay = player ? 300 / player.stats.speed : 300;
@@ -390,6 +749,8 @@ export default function GameCanvas() {
     const currentMonsters = useGameStore.getState().monsters;
     const currentOthers = useGameStore.getState().otherPlayers;
     const currentDmgNumbers = useGameStore.getState().damageNumbers;
+    const currentSpellEffects = useGameStore.getState().spellEffects;
+    const currentBuffEnd = useGameStore.getState().buffEndTime;
     if (!ctx || !currentPlayer) return;
 
     const canvasWidth = canvas.width;
@@ -451,13 +812,17 @@ export default function GameCanvas() {
       const screenX = other.position.x * TILE_SIZE - camX;
       const screenY = other.position.y * TILE_SIZE - camY;
       if (screenX > -TILE_SIZE && screenX < canvasWidth && screenY > -TILE_SIZE && screenY < canvasHeight) {
-        drawPlayerSprite(ctx, other.name, screenX, screenY, other.direction as Direction, '#3498db', other.level, other.health, other.maxHealth);
+        drawPlayerSprite(ctx, other.name, screenX, screenY, other.direction as Direction, '#3498db', other.level, other.health, other.maxHealth, false);
       }
     }
 
     const playerScreenX = currentPlayer.position.x * TILE_SIZE - camX;
     const playerScreenY = currentPlayer.position.y * TILE_SIZE - camY;
-    drawPlayerSprite(ctx, currentPlayer.name, playerScreenX, playerScreenY, currentPlayer.direction, '#e67e22', currentPlayer.stats.level, currentPlayer.stats.health, currentPlayer.stats.maxHealth);
+    const hasBuff = Date.now() < currentBuffEnd;
+    drawPlayerSprite(ctx, currentPlayer.name, playerScreenX, playerScreenY, currentPlayer.direction, '#e67e22', currentPlayer.stats.level, currentPlayer.stats.health, currentPlayer.stats.maxHealth, hasBuff);
+
+    // Render spell effects
+    renderSpellEffects(ctx, currentSpellEffects, camX, camY);
 
     renderDamageNumbers(ctx, currentDmgNumbers, camX, camY);
 
@@ -466,11 +831,11 @@ export default function GameCanvas() {
     const totalGameHours = (gameMinutes / 60) % 24;
     let nightAlpha = 0;
     if (totalGameHours >= 21 || totalGameHours < 6) {
-      nightAlpha = 0.35; // Night
+      nightAlpha = 0.35;
     } else if (totalGameHours >= 18) {
-      nightAlpha = 0.15 + (totalGameHours - 18) / 3 * 0.2; // Evening transition
+      nightAlpha = 0.15 + (totalGameHours - 18) / 3 * 0.2;
     } else if (totalGameHours < 8) {
-      nightAlpha = 0.35 - (totalGameHours - 6) / 2 * 0.35; // Morning transition
+      nightAlpha = 0.35 - (totalGameHours - 6) / 2 * 0.35;
     }
     if (nightAlpha > 0) {
       ctx.fillStyle = `rgba(10, 10, 40, ${nightAlpha})`;
@@ -482,13 +847,13 @@ export default function GameCanvas() {
     const py = currentPlayer.position.y;
     let areaName = '';
     let areaColor = '#fff';
-    if (px >= 34 && px <= 66 && py >= 34 && py <= 61) { areaName = '🏛️ Tibia Town (Safe Zone)'; areaColor = '#f1c40f'; }
-    else if (px >= 5 && px <= 95 && py >= 2 && py <= 30) { areaName = '🌲 Northern Forest'; areaColor = '#2ecc71'; }
-    else if (px >= 5 && px <= 95 && py >= 65 && py <= 98) { areaName = '🌿 Southern Swamp'; areaColor = '#27ae60'; }
-    else if (px >= 2 && px <= 32 && py >= 5 && py <= 63) { areaName = '🏜️ Western Desert'; areaColor = '#e67e22'; }
-    else if (px >= 70 && px <= 98 && py >= 5 && py <= 63) { areaName = '⛰️ Eastern Mountains'; areaColor = '#95a5a6'; }
-    else if (px >= 2 && px <= 12 && py >= 88 && py <= 98) { areaName = '🔥 Lava Fields (BOSS)'; areaColor = '#e74c3c'; }
-    else if (px >= 88 && px <= 98 && py >= 88 && py <= 98) { areaName = '🐉 Dark Forest (LEGEND)'; areaColor = '#c0392b'; }
+    if (px >= 34 && px <= 66 && py >= 34 && py <= 61) { areaName = 'Tibia Town (Safe Zone)'; areaColor = '#f1c40f'; }
+    else if (px >= 5 && px <= 95 && py >= 2 && py <= 30) { areaName = 'Northern Forest'; areaColor = '#2ecc71'; }
+    else if (px >= 5 && px <= 95 && py >= 65 && py <= 98) { areaName = 'Southern Swamp'; areaColor = '#27ae60'; }
+    else if (px >= 2 && px <= 32 && py >= 5 && py <= 63) { areaName = 'Western Desert'; areaColor = '#e67e22'; }
+    else if (px >= 70 && px <= 98 && py >= 5 && py <= 63) { areaName = 'Eastern Mountains'; areaColor = '#95a5a6'; }
+    else if (px >= 2 && px <= 12 && py >= 88 && py <= 98) { areaName = 'Lava Fields (BOSS)'; areaColor = '#e74c3c'; }
+    else if (px >= 88 && px <= 98 && py >= 88 && py <= 98) { areaName = 'Dark Forest (LEGEND)'; areaColor = '#c0392b'; }
 
     if (areaName) {
       ctx.font = 'bold 12px sans-serif';
@@ -530,7 +895,10 @@ export default function GameCanvas() {
       store.updateMonsters(deltaTime);
       store.regenMana(deltaTime);
 
-      if (now % 500 < 20) store.cleanupDamageNumbers();
+      if (now % 500 < 20) {
+        store.cleanupDamageNumbers();
+        store.cleanupSpellEffects();
+      }
 
       doRender();
       animFrameRef.current = requestAnimationFrame(gameLoopRef.current!);
@@ -546,14 +914,23 @@ export default function GameCanvas() {
       const key = e.key.toLowerCase();
       keysPressed.current.add(key);
 
+      // Space = physical attack with sword
       if (key === ' ') {
         e.preventDefault();
         useGameStore.getState().attackMonster();
       }
+      // E = interact with NPC
       if (key === 'e') {
         useGameStore.getState().interactNPC();
       }
 
+      // F1-F4 = cast skills
+      if (key === 'f1') { e.preventDefault(); useGameStore.getState().castSkill(0); }
+      if (key === 'f2') { e.preventDefault(); useGameStore.getState().castSkill(1); }
+      if (key === 'f3') { e.preventDefault(); useGameStore.getState().castSkill(2); }
+      if (key === 'f4') { e.preventDefault(); useGameStore.getState().castSkill(3); }
+
+      // 1-9 = use inventory items
       const num = parseInt(key);
       if (num >= 1 && num <= 9) {
         const store = useGameStore.getState();

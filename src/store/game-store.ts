@@ -10,12 +10,14 @@ import {
   MonsterInstance,
   OtherPlayer,
   DamageNumber,
+  SpellEffect,
   Vocation,
   EquipSlot,
   InventoryItem,
   NPCDefinition,
   GameMap,
   MonsterZone,
+  DIR_OFFSETS,
 } from '@/lib/game/types';
 import { calculateStats, VOCATION_STATS } from '@/lib/game/types';
 import { getGameMap } from '@/lib/game/tilemap';
@@ -28,6 +30,7 @@ import {
   calculateLevelUpStats,
   generateLoot,
 } from '@/lib/game/combat';
+import { getSkillsForVocation, getSkillEffectType } from '@/lib/game/skills';
 
 export type GameScreen = 'login' | 'game' | 'dead';
 
@@ -67,6 +70,14 @@ interface GameState {
   damageNumbers: DamageNumber[];
   addDamageNumber: (position: { x: number; y: number }, value: number, type: DamageNumber['type']) => void;
   cleanupDamageNumbers: () => void;
+
+  // Spell Effects
+  spellEffects: SpellEffect[];
+  addSpellEffect: (effect: Omit<SpellEffect, 'id'>) => void;
+  cleanupSpellEffects: () => void;
+  castSkill: (skillIndex: number) => void;
+  skillCooldowns: Record<string, number>;
+  buffEndTime: number;
 
   // Inventory
   addToInventory: (itemId: string, quantity: number) => void;
@@ -139,7 +150,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     get().addChatMessage({
       type: 'system',
       sender: 'System',
-      content: `Welcome to Tibia Lands, ${name} the ${vocation}! Use WASD to move. Click on monsters to attack. Use numbers 1-9 for items.`,
+      content: `Welcome to Tibia Lands, ${name} the ${vocation}! WASD: Move | Space/Click: Attack | F1-F4: Skills | 1-9: Items | E: Interact`,
       color: '#f1c40f',
     });
   },
@@ -367,7 +378,18 @@ export const useGameStore = create<GameState>((set, get) => ({
       );
     }
 
-    if (!targetMonster) return;
+    if (!targetMonster) {
+      // Show sword slash even if no target
+      get().addSpellEffect({
+        type: 'sword_slash',
+        position: { ...player.position },
+        direction: player.direction,
+        color: '#c0c0c0',
+        startTime: Date.now(),
+        duration: 300,
+      });
+      return;
+    }
 
     const def = MONSTERS[targetMonster.definitionId];
     if (!def) return;
@@ -376,6 +398,16 @@ export const useGameStore = create<GameState>((set, get) => ({
       ...targetMonster,
       attack: def.attack,
       defense: def.defense,
+    });
+
+    // Sword slash visual effect
+    get().addSpellEffect({
+      type: 'sword_slash',
+      position: { ...player.position },
+      direction: player.direction,
+      color: result.isCritical ? '#ff4444' : '#c0c0c0',
+      startTime: Date.now(),
+      duration: 300,
     });
 
     if (result.isMiss) {
@@ -530,6 +562,192 @@ export const useGameStore = create<GameState>((set, get) => ({
     set(state => ({
       damageNumbers: state.damageNumbers.filter(dn => now - dn.timestamp < 2000),
     }));
+  },
+
+  // Spell Effects
+  spellEffects: [],
+  skillCooldowns: {},
+  buffEndTime: 0,
+  addSpellEffect: (effect) => {
+    const ef: SpellEffect = {
+      ...effect,
+      id: `ef_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+    };
+    set(state => ({ spellEffects: [...state.spellEffects, ef] }));
+  },
+  cleanupSpellEffects: () => {
+    const now = Date.now();
+    set(state => ({
+      spellEffects: state.spellEffects.filter(ef => now - ef.startTime < ef.duration),
+    }));
+  },
+
+  castSkill: (skillIndex) => {
+    const { player, monsters, addDamageNumber, addChatMessage, addSpellEffect, skillCooldowns, buffEndTime, addToInventory } = get();
+    if (!player) return;
+
+    const skills = getSkillsForVocation(player.vocation);
+    const skill = skills[skillIndex];
+    if (!skill) return;
+
+    if (player.stats.level < skill.levelReq) {
+      addChatMessage({ type: 'system', sender: 'Skills', content: `Need level ${skill.levelReq} for ${skill.name}!`, color: '#e74c3c' });
+      return;
+    }
+
+    if (player.stats.mana < skill.manaCost) {
+      addChatMessage({ type: 'system', sender: 'Skills', content: `Not enough mana! Need ${skill.manaCost} MP.`, color: '#3498db' });
+      return;
+    }
+
+    const now = Date.now();
+    const lastUsed = skillCooldowns[skill.id] || 0;
+    if (now - lastUsed < skill.cooldown) {
+      const remaining = Math.ceil((skill.cooldown - (now - lastUsed)) / 1000);
+      addChatMessage({ type: 'system', sender: 'Skills', content: `${skill.name} on cooldown! ${remaining}s.`, color: '#e67e22' });
+      return;
+    }
+
+    // Deduct mana
+    set(state => {
+      if (!state.player) return state;
+      return {
+        player: { ...state.player, stats: { ...state.player.stats, mana: Math.max(0, state.player.stats.mana - skill.manaCost) } },
+        skillCooldowns: { ...state.skillCooldowns, [skill.id]: now },
+      };
+    });
+
+    // Determine effect visual type
+    const effectType = skill.type === 'heal' ? 'heal_aura' as const : getSkillEffectType(skill.id);
+
+    if (skill.type === 'heal' && skill.healAmount) {
+      // Heal spells
+      const newHealth = Math.min(player.stats.maxHealth, player.stats.health + skill.healAmount);
+      const healed = newHealth - player.stats.health;
+      set(state => {
+        if (!state.player) return state;
+        return { player: { ...state.player, stats: { ...state.player.stats, health: newHealth } } };
+      });
+      addDamageNumber(player.position, healed, 'heal');
+      addSpellEffect({ type: 'heal_aura', position: player.position, color: skill.color, startTime: now, duration: 800 });
+      addChatMessage({ type: 'combat', sender: 'Skill', content: `${skill.icon} ${skill.name}! +${healed} HP`, color: skill.color });
+      return;
+    }
+
+    if (skill.type === 'buff') {
+      set({ buffEndTime: now + 10000 });
+      addSpellEffect({ type: 'war_cry', position: player.position, color: skill.color, startTime: now, duration: 1000 });
+      addChatMessage({ type: 'combat', sender: 'Skill', content: `${skill.icon} ${skill.name}! Attack boosted 10s!`, color: skill.color });
+      return;
+    }
+
+    // Attack spells - find target
+    const dirOffset = DIR_OFFSETS[player.direction];
+    let targetMonster: MonsterInstance | undefined;
+
+    if (skill.range <= 1) {
+      // Melee - check in front first, then adjacent
+      targetMonster = monsters.find(m =>
+        !m.isDead && m.position.x === player.position.x + dirOffset.x && m.position.y === player.position.y + dirOffset.y
+      );
+      if (!targetMonster) {
+        targetMonster = monsters.find(m =>
+          !m.isDead && Math.abs(m.position.x - player.position.x) <= 1 && Math.abs(m.position.y - player.position.y) <= 1
+        );
+      }
+    } else {
+      // Ranged - find closest monster in direction, up to range
+      let closestDist = Infinity;
+      for (const m of monsters) {
+        if (m.isDead) continue;
+        const dx = m.position.x - player.position.x;
+        const dy = m.position.y - player.position.y;
+        const dist = Math.max(Math.abs(dx), Math.abs(dy));
+        if (dist > skill.range) continue;
+        // Check if monster is roughly in the direction the player faces
+        const dotProduct = dx * dirOffset.x + dy * dirOffset.y;
+        if (dotProduct > 0 || dist <= 2) { // Allow some leeway
+          if (dist < closestDist) {
+            closestDist = dist;
+            targetMonster = m;
+          }
+        }
+      }
+    }
+
+    if (!targetMonster) {
+      // Show effect at the direction player faces even if no target
+      const fx = player.position.x + dirOffset.x * Math.min(skill.range, 3);
+      const fy = player.position.y + dirOffset.y * Math.min(skill.range, 3);
+      addSpellEffect({ type: effectType, position: player.position, direction: player.direction, targetPosition: { x: fx, y: fy }, color: skill.color, startTime: now, duration: 600, size: skill.range });
+      addChatMessage({ type: 'system', sender: 'Skill', content: `${skill.icon} ${skill.name}! No target.`, color: '#95a5a6' });
+      return;
+    }
+
+    // Calculate damage
+    const buffBonus = now < (get().buffEndTime) ? 1.3 : 1.0;
+    const magicPower = player.stats.magicAttack + (skill.damage || 0) * 0.3;
+    const variance = 0.8 + Math.random() * 0.4;
+    let dmg = Math.floor((skill.damage || 30) + magicPower * 0.5 * variance * buffBonus);
+    const def = MONSTERS[targetMonster.definitionId];
+    if (def) dmg = Math.max(1, dmg - Math.floor(def.defense * 0.3));
+
+    addDamageNumber(targetMonster.position, -dmg, 'damage');
+
+    // Visual effect
+    addSpellEffect({
+      type: effectType,
+      position: player.position,
+      direction: player.direction,
+      targetPosition: { ...targetMonster.position },
+      color: skill.color,
+      startTime: now,
+      duration: 600,
+      size: skill.range,
+      damage: dmg,
+    });
+
+    const newMonsterHealth = targetMonster.health - dmg;
+
+    if (newMonsterHealth <= 0) {
+      // Monster killed
+      if (def) {
+        addChatMessage({ type: 'combat', sender: 'Skill', content: `${skill.icon} ${skill.name} killed ${def.name}! +${def.experience} XP`, color: '#f1c40f' });
+        addDamageNumber(targetMonster.position, def.experience, 'xp');
+
+        // Loot
+        const loot = generateLoot(def.lootTable);
+        for (const drop of loot) {
+          if (drop.itemId === 'gold_coin') {
+            set(state => ({ player: state.player ? { ...state.player, gold: state.player.gold + drop.quantity } : null }));
+          } else {
+            addToInventory(drop.itemId, drop.quantity);
+          }
+        }
+
+        // XP
+        set(state => {
+          if (!state.player) return state;
+          const newExp = state.player.stats.experience + def.experience;
+          const { leveledUp, newLevel, newExpToNext } = calculateLevelUpStats(state.player.stats.level, newExp, state.player.stats.experienceToNext);
+          if (leveledUp) {
+            const newStats = calculateStats(state.player.vocation, newLevel);
+            addChatMessage({ type: 'system', sender: 'Level Up!', content: `🎉 Level ${newLevel}!`, color: '#f1c40f' });
+            return { player: { ...state.player, stats: { ...newStats, experience: newExp - state.player.stats.experienceToNext, health: newStats.maxHealth, mana: newStats.maxMana } } };
+          }
+          return { player: { ...state.player, stats: { ...state.player.stats, experience: newExp } } };
+        });
+      }
+
+      set(state => ({
+        monsters: state.monsters.map(m => m.id === targetMonster.id ? { ...m, isDead: true, health: 0, deathTime: Date.now(), targetId: undefined } : m),
+      }));
+    } else {
+      set(state => ({
+        monsters: state.monsters.map(m => m.id === targetMonster.id ? { ...m, health: newMonsterHealth } : m),
+      }));
+      if (def) addChatMessage({ type: 'combat', sender: 'Skill', content: `${skill.icon} ${skill.name} hit ${def.name} for ${dmg}!`, color: skill.color });
+    }
   },
 
   addToInventory: (itemId, quantity) => {

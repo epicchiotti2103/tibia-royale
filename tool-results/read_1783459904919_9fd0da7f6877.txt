@@ -1,0 +1,816 @@
+     1→// =============================================
+     2→// Tibia-Style Game - Zustand Store
+     3→// =============================================
+     4→
+     5→import { create } from 'zustand';
+     6→import {
+     7→  PlayerData,
+     8→  Direction,
+     9→  ChatMessage,
+    10→  MonsterInstance,
+    11→  OtherPlayer,
+    12→  DamageNumber,
+    13→  Vocation,
+    14→  EquipSlot,
+    15→  InventoryItem,
+    16→  NPCDefinition,
+    17→  GameMap,
+    18→  MonsterZone,
+    19→} from '@/lib/game/types';
+    20→import { calculateStats, VOCATION_STATS } from '@/lib/game/types';
+    21→import { getGameMap } from '@/lib/game/tilemap';
+    22→import { MONSTERS } from '@/lib/game/monsters';
+    23→import { ITEMS } from '@/lib/game/items';
+    24→import {
+    25→  playerAttackMonster,
+    26→  monsterAttackPlayer,
+    27→  consumeItem,
+    28→  calculateLevelUpStats,
+    29→  generateLoot,
+    30→} from '@/lib/game/combat';
+    31→
+    32→export type GameScreen = 'login' | 'game' | 'dead';
+    33→
+    34→interface GameState {
+    35→  // Screen
+    36→  screen: GameScreen;
+    37→  setScreen: (screen: GameScreen) => void;
+    38→
+    39→  // Player
+    40→  player: PlayerData | null;
+    41→  createPlayer: (name: string, vocation: Vocation) => void;
+    42→
+    43→  // Game Map
+    44→  gameMap: GameMap;
+    45→
+    46→  // Monsters
+    47→  monsters: MonsterInstance[];
+    48→  spawnMonsters: () => void;
+    49→  updateMonsters: (deltaTime: number) => void;
+    50→
+    51→  // Other Players (multiplayer)
+    52→  otherPlayers: OtherPlayer[];
+    53→  setOtherPlayers: (players: OtherPlayer[]) => void;
+    54→  updateOtherPlayer: (player: OtherPlayer) => void;
+    55→  removeOtherPlayer: (id: string) => void;
+    56→
+    57→  // Movement
+    58→  movePlayer: (direction: Direction) => void;
+    59→  attackMonster: () => void;
+    60→  interactNPC: () => void;
+    61→
+    62→  // Chat
+    63→  chatMessages: ChatMessage[];
+    64→  addChatMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
+    65→
+    66→  // Combat
+    67→  damageNumbers: DamageNumber[];
+    68→  addDamageNumber: (position: { x: number; y: number }, value: number, type: DamageNumber['type']) => void;
+    69→  cleanupDamageNumbers: () => void;
+    70→
+    71→  // Inventory
+    72→  addToInventory: (itemId: string, quantity: number) => void;
+    73→  removeFromInventory: (invItemId: string, quantity: number) => void;
+    74→  consumeInventoryItem: (invItemId: string) => void;
+    75→  equipItem: (invItemId: string) => void;
+    76→  unequipItem: (slot: EquipSlot) => void;
+    77→
+    78→  // NPC Interaction
+    79→  activeNPC: NPCDefinition | null;
+    80→  setActiveNPC: (npc: NPCDefinition | null) => void;
+    81→  buyItem: (itemId: string) => void;
+    82→
+    83→  // Player death / respawn
+    84→  playerDeath: () => void;
+    85→  respawn: () => void;
+    86→
+    87→  // Mana regeneration
+    88→  regenMana: (deltaTime: number) => void;
+    89→}
+    90→
+    91→let monsterIdCounter = 0;
+    92→function generateMonsterId(): string {
+    93→  return `monster_${++monsterIdCounter}`;
+    94→}
+    95→
+    96→function generateLootId(): string {
+    97→  return `loot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    98→}
+    99→
+   100→function isPositionBlocked(x: number, y: number, map: GameMap): boolean {
+   101→  if (x < 0 || x >= map.tiles[0].length || y < 0 || y >= map.tiles.length) return true;
+   102→  const tile = map.tiles[y][x];
+   103→  return tile === 4 ? false : // SAND is walkable
+   104→    (tile === 2 || tile === 7 || tile === 6 || tile === 13 || tile === 14); // WATER, WALL, LAVA, TREE, ROCK
+   105→}
+   106→
+   107→export const useGameStore = create<GameState>((set, get) => ({
+   108→  screen: 'login',
+   109→  setScreen: (screen) => set({ screen }),
+   110→
+   111→  player: null,
+   112→  createPlayer: (name, vocation) => {
+   113→    const map = getGameMap();
+   114→    const stats = calculateStats(vocation, 1);
+   115→    const player: PlayerData = {
+   116→      id: `player_${Date.now()}`,
+   117→      name,
+   118→      vocation,
+   119→      position: { ...map.spawnPoint },
+   120→      direction: Direction.SOUTH,
+   121→      stats,
+   122→      equipment: {
+   123→        [EquipSlot.WEAPON]: 'wooden_sword',
+   124→        [EquipSlot.ARMOR]: null,
+   125→        [EquipSlot.SHIELD]: null,
+   126→        [EquipSlot.HELMET]: null,
+   127→        [EquipSlot.LEGS]: null,
+   128→        [EquipSlot.BOOTS]: null,
+   129→        [EquipSlot.RING]: null,
+   130→        [EquipSlot.AMULET]: null,
+   131→      },
+   132→      inventory: [
+   133→        { id: generateLootId(), itemId: 'health_potion_small', quantity: 5, slot: 0 },
+   134→        { id: generateLootId(), itemId: 'mana_potion_small', quantity: 3, slot: 1 },
+   135→      ],
+   136→      gold: 50,
+   137→    };
+   138→    set({ player, screen: 'game' });
+   139→    get().addChatMessage({
+   140→      type: 'system',
+   141→      sender: 'System',
+   142→      content: `Welcome to Tibia Lands, ${name} the ${vocation}! Use WASD to move. Click on monsters to attack. Use numbers 1-9 for items.`,
+   143→      color: '#f1c40f',
+   144→    });
+   145→  },
+   146→
+   147→  gameMap: getGameMap(),
+   148→
+   149→  monsters: [],
+   150→  spawnMonsters: () => {
+   151→    const map = get().gameMap;
+   152→    const monsters: MonsterInstance[] = [];
+   153→
+   154→    for (const zone of map.monsterZones) {
+   155→      for (let i = 0; i < zone.maxMonsters; i++) {
+   156→        const monsterDefId = zone.monsterIds[Math.floor(Math.random() * zone.monsterIds.length)];
+   157→        const def = MONSTERS[monsterDefId];
+   158→        if (!def) continue;
+   159→
+   160→        // Find valid spawn position
+   161→        let spawnX = 0, spawnY = 0;
+   162→        let attempts = 0;
+   163→        do {
+   164→          spawnX = zone.area.x + Math.floor(Math.random() * zone.area.width);
+   165→          spawnY = zone.area.y + Math.floor(Math.random() * zone.area.height);
+   166→          attempts++;
+   167→        } while (isPositionBlocked(spawnX, spawnY, map) && attempts < 50);
+   168→
+   169→        if (attempts < 50) {
+   170→          monsters.push({
+   171→            id: generateMonsterId(),
+   172→            definitionId: monsterDefId,
+   173→            position: { x: spawnX, y: spawnY },
+   174→            health: def.health,
+   175→            maxHealth: def.maxHealth,
+   176→            lastAttackTime: 0,
+   177→            spawnPosition: { x: spawnX, y: spawnY },
+   178→            respawnTime: zone.spawnRate,
+   179→            isDead: false,
+   180→          });
+   181→        }
+   182→      }
+   183→    }
+   184→
+   185→    set({ monsters });
+   186→  },
+   187→
+   188→  updateMonsters: (deltaTime) => {
+   189→    const { monsters, player, gameMap, addDamageNumber, addChatMessage } = get();
+   190→    if (!player) return;
+   191→
+   192→    const now = Date.now();
+   193→    const updatedMonsters = monsters.map(monster => {
+   194→      if (monster.isDead) {
+   195→        // Check respawn
+   196→        if (monster.deathTime && now - monster.deathTime > monster.respawnTime) {
+   197→          const def = MONSTERS[monster.definitionId];
+   198→          if (def) {
+   199→            return {
+   200→              ...monster,
+   201→              health: def.health,
+   202→              maxHealth: def.maxHealth,
+   203→              isDead: false,
+   204→              position: { ...monster.spawnPosition },
+   205→              targetId: undefined,
+   206→              lastAttackTime: 0,
+   207→            };
+   208→          }
+   209→        }
+   210→        return monster;
+   211→      }
+   212→
+   213→      const def = MONSTERS[monster.definitionId];
+   214→      if (!def) return monster;
+   215→
+   216→      const dx = player.position.x - monster.position.x;
+   217→      const dy = player.position.y - monster.position.y;
+   218→      const dist = Math.sqrt(dx * dx + dy * dy);
+   219→
+   220→      // Check if monster should chase player
+   221→      if (def.aggressive && dist < def.chaseRange) {
+   222→        monster.targetId = player.id;
+   223→      } else if (dist > def.chaseRange + 3) {
+   224→        monster.targetId = undefined;
+   225→      }
+   226→
+   227→      // Movement
+   228→      if (monster.targetId) {
+   229→        if (dist > def.attackRange) {
+   230→          // Move towards player
+   231→          const moveX = dx > 0 ? 1 : dx < 0 ? -1 : 0;
+   232→          const moveY = dy > 0 ? 1 : dy < 0 ? -1 : 0;
+   233→
+   234→          // Try to move
+   235→          let newX = monster.position.x + moveX;
+   236→          let newY = monster.position.y + moveY;
+   237→
+   238→          // Simple collision avoidance
+   239→          if (!isPositionBlocked(newX, newY, gameMap) && !isMonsterAt(newX, newY, monsters, monster.id)) {
+   240→            monster.position = { x: newX, y: newY };
+   241→          } else if (moveX !== 0 && !isPositionBlocked(newX, monster.position.y, gameMap)) {
+   242→            monster.position = { x: newX, y: monster.position.y };
+   243→          } else if (moveY !== 0 && !isPositionBlocked(monster.position.x, newY, gameMap)) {
+   244→            monster.position = { x: monster.position.x, y: newY };
+   245→          }
+   246→        } else if (dist <= def.attackRange && now - monster.lastAttackTime > def.attackSpeed) {
+   247→          // Attack player
+   248→          monster.lastAttackTime = now;
+   249→          const result = monsterAttackPlayer(
+   250→            { ...monster, attack: def.attack, defense: def.defense },
+   251→            player.stats,
+   252→            player.equipment
+   253→          );
+   254→
+   255→          if (result.isMiss) {
+   256→            addDamageNumber(player.position, 0, 'miss');
+   257→          } else {
+   258→            addDamageNumber(player.position, -result.damage, 'damage');
+   259→          }
+   260→
+   261→          // Update player health
+   262→          const newHealth = Math.max(0, player.stats.health - result.damage);
+   263→          set(state => ({
+   264→            player: state.player ? {
+   265→              ...state.player,
+   266→              stats: { ...state.player.stats, health: newHealth },
+   267→            } : null,
+   268→          }));
+   269→
+   270→          if (newHealth <= 0) {
+   271→            addChatMessage({
+   272→              type: 'combat',
+   273→              sender: 'System',
+   274→              content: `You were killed by ${def.name}!`,
+   275→              color: '#e74c3c',
+   276→            });
+   277→            setTimeout(() => get().playerDeath(), 500);
+   278→          }
+   279→        }
+   280→      } else {
+   281→        // Random wander
+   282→        if (Math.random() < 0.01 * deltaTime) {
+   283→          const dirs = [
+   284→            { x: 1, y: 0 }, { x: -1, y: 0 },
+   285→            { x: 0, y: 1 }, { x: 0, y: -1 },
+   286→          ];
+   287→          const dir = dirs[Math.floor(Math.random() * dirs.length)];
+   288→          const newX = monster.position.x + dir.x;
+   289→          const newY = monster.position.y + dir.y;
+   290→          if (!isPositionBlocked(newX, newY, gameMap) &&
+   291→              Math.abs(newX - monster.spawnPosition.x) < 8 &&
+   292→              Math.abs(newY - monster.spawnPosition.y) < 8) {
+   293→            monster.position = { x: newX, y: newY };
+   294→          }
+   295→        }
+   296→      }
+   297→
+   298→      return { ...monster };
+   299→    });
+   300→
+   301→    set({ monsters: updatedMonsters });
+   302→  },
+   303→
+   304→  otherPlayers: [],
+   305→  setOtherPlayers: (players) => set({ otherPlayers: players }),
+   306→  updateOtherPlayer: (player) => {
+   307→    set(state => ({
+   308→      otherPlayers: state.otherPlayers.some(p => p.id === player.id)
+   309→        ? state.otherPlayers.map(p => p.id === player.id ? player : p)
+   310→        : [...state.otherPlayers, player],
+   311→    }));
+   312→  },
+   313→  removeOtherPlayer: (id) => {
+   314→    set(state => ({
+   315→      otherPlayers: state.otherPlayers.filter(p => p.id !== id),
+   316→    }));
+   317→  },
+   318→
+   319→  movePlayer: (direction) => {
+   320→    const { player, gameMap, monsters } = get();
+   321→    if (!player) return;
+   322→
+   323→    const dx = direction === Direction.EAST ? 1 : direction === Direction.WEST ? -1 : 0;
+   324→    const dy = direction === Direction.SOUTH ? 1 : direction === Direction.NORTH ? -1 : 0;
+   325→    const newX = player.position.x + dx;
+   326→    const newY = player.position.y + dy;
+   327→
+   328→    // Bounds check
+   329→    if (newX < 0 || newX >= gameMap.tiles[0].length || newY < 0 || newY >= gameMap.tiles.length) return;
+   330→
+   331→    // Tile collision
+   332→    if (isPositionBlocked(newX, newY, gameMap)) return;
+   333→
+   334→    // Monster collision (don't walk on monsters)
+   335→    if (isMonsterAt(newX, newY, monsters)) return;
+   336→
+   337→    set(state => ({
+   338→      player: state.player ? {
+   339→        ...state.player,
+   340→        position: { x: newX, y: newY },
+   341→        direction,
+   342→      } : null,
+   343→    }));
+   344→  },
+   345→
+   346→  attackMonster: () => {
+   347→    const { player, monsters, addDamageNumber, addChatMessage, addToInventory } = get();
+   348→    if (!player) return;
+   349→
+   350→    // Find monster in front of player
+   351→    const dx = player.direction === Direction.EAST ? 1 : player.direction === Direction.WEST ? -1 : 0;
+   352→    const dy = player.direction === Direction.SOUTH ? 1 : player.direction === Direction.NORTH ? -1 : 0;
+   353→    const targetX = player.position.x + dx;
+   354→    const targetY = player.position.y + dy;
+   355→
+   356→    // Also check adjacent tiles
+   357→    let targetMonster = monsters.find(m =>
+   358→      !m.isDead && m.position.x === targetX && m.position.y === targetY
+   359→    );
+   360→
+   361→    // If no monster in front, check all adjacent
+   362→    if (!targetMonster) {
+   363→      targetMonster = monsters.find(m =>
+   364→        !m.isDead &&
+   365→        Math.abs(m.position.x - player.position.x) <= 1 &&
+   366→        Math.abs(m.position.y - player.position.y) <= 1
+   367→      );
+   368→    }
+   369→
+   370→    if (!targetMonster) return;
+   371→
+   372→    const def = MONSTERS[targetMonster.definitionId];
+   373→    if (!def) return;
+   374→
+   375→    const result = playerAttackMonster(player.stats, player.equipment, {
+   376→      ...targetMonster,
+   377→      attack: def.attack,
+   378→      defense: def.defense,
+   379→    });
+   380→
+   381→    if (result.isMiss) {
+   382→      addDamageNumber(targetMonster.position, 0, 'miss');
+   383→      addChatMessage({ type: 'combat', sender: 'Combat', content: `You missed the ${def.name}!`, color: '#95a5a6' });
+   384→    } else {
+   385→      const prefix = result.isCritical ? '💥 CRITICAL! ' : '';
+   386→      addDamageNumber(targetMonster.position, -result.damage, 'damage');
+   387→      addChatMessage({
+   388→        type: 'combat',
+   389→        sender: 'Combat',
+   390→        content: `${prefix}You hit ${def.name} for ${result.damage} damage.`,
+   391→        color: result.isCritical ? '#e74c3c' : '#e67e22',
+   392→      });
+   393→
+   394→      // Update monster health
+   395→      const newMonsterHealth = targetMonster.health - result.damage;
+   396→
+   397→      if (newMonsterHealth <= 0) {
+   398→        // Monster defeated
+   399→        addChatMessage({
+   400→          type: 'combat',
+   401→          sender: 'System',
+   402→          content: `You defeated ${def.name}! +${def.experience} XP`,
+   403→          color: '#f1c40f',
+   404→        });
+   405→
+   406→        // Track quest kills
+   407→        if (typeof window !== 'undefined' && (window as any).__questTrackKill) {
+   408→          (window as any).__questTrackKill(targetMonster.definitionId);
+   409→        }
+   410→
+   411→        addDamageNumber(targetMonster.position, def.experience, 'xp');
+   412→
+   413→        // Generate loot
+   414→        const loot = generateLoot(def.lootTable);
+   415→        let lootMsg = 'Loot: ';
+   416→        for (const drop of loot) {
+   417→          if (drop.itemId === 'gold_coin') {
+   418→            set(state => ({
+   419→              player: state.player ? { ...state.player, gold: state.player.gold + drop.quantity } : null,
+   420→            }));
+   421→            lootMsg += `${drop.quantity} gold, `;
+   422→          } else {
+   423→            addToInventory(drop.itemId, drop.quantity);
+   424→            const itemDef = ITEMS[drop.itemId];
+   425→            if (itemDef) lootMsg += `${itemDef.name} x${drop.quantity}, `;
+   426→          }
+   427→        }
+   428→        if (loot.length > 0) {
+   429→          addChatMessage({ type: 'combat', sender: 'Loot', content: lootMsg.slice(0, -2), color: '#2ecc71' });
+   430→        }
+   431→
+   432→        // Update XP
+   433→        set(state => {
+   434→          if (!state.player) return state;
+   435→          const newExp = state.player.stats.experience + def.experience;
+   436→          const { leveledUp, newLevel, newExpToNext } = calculateLevelUpStats(
+   437→            state.player.stats.level,
+   438→            newExp,
+   439→            state.player.stats.experienceToNext
+   440→          );
+   441→
+   442→          if (leveledUp) {
+   443→            const newStats = calculateStats(state.player.vocation, newLevel);
+   444→            addChatMessage({
+   445→              type: 'system',
+   446→              sender: 'Level Up!',
+   447→              content: `🎉 Congratulations! You are now level ${newLevel}!`,
+   448→              color: '#f1c40f',
+   449→            });
+   450→            return {
+   451→              player: {
+   452→                ...state.player,
+   453→                stats: {
+   454→                  ...newStats,
+   455→                  experience: newExp - state.player.stats.experienceToNext,
+   456→                  health: newStats.maxHealth,
+   457→                  mana: newStats.maxMana,
+   458→                },
+   459→              },
+   460→            };
+   461→          }
+   462→
+   463→          return {
+   464→            player: {
+   465→              ...state.player,
+   466→              stats: {
+   467→                ...state.player.stats,
+   468→                experience: newExp,
+   469→              },
+   470→            },
+   471→          };
+   472→        });
+   473→
+   474→        // Mark monster as dead
+   475→        set(state => ({
+   476→          monsters: state.monsters.map(m =>
+   477→            m.id === targetMonster.id
+   478→              ? { ...m, isDead: true, health: 0, deathTime: Date.now(), targetId: undefined }
+   479→              : m
+   480→          ),
+   481→        }));
+   482→      } else {
+   483→        // Update monster health
+   484→        set(state => ({
+   485→          monsters: state.monsters.map(m =>
+   486→            m.id === targetMonster.id ? { ...m, health: newMonsterHealth } : m
+   487→          ),
+   488→        }));
+   489→      }
+   490→    }
+   491→  },
+   492→
+   493→  interactNPC: () => {
+   494→    const { player, gameMap, setActiveNPC } = get();
+   495→    if (!player) return;
+   496→
+   497→    const npc = gameMap.npcs.find(n =>
+   498→      Math.abs(n.position.x - player.position.x) <= 2 &&
+   499→      Math.abs(n.position.y - player.position.y) <= 2
+   500→    );
+   501→
+   502→    if (npc) {
+   503→      setActiveNPC(npc);
+   504→    }
+   505→  },
+   506→
+   507→  chatMessages: [],
+   508→  addChatMessage: (message) => {
+   509→    const msg: ChatMessage = {
+   510→      ...message,
+   511→      id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+   512→      timestamp: Date.now(),
+   513→    };
+   514→    set(state => ({ chatMessages: [...state.chatMessages.slice(-100), msg] }));
+   515→  },
+   516→
+   517→  damageNumbers: [],
+   518→  addDamageNumber: (position, value, type) => {
+   519→    const dn: DamageNumber = {
+   520→      id: `dn_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+   521→      position: { ...position },
+   522→      value,
+   523→      type,
+   524→      timestamp: Date.now(),
+   525→    };
+   526→    set(state => ({ damageNumbers: [...state.damageNumbers, dn] }));
+   527→  },
+   528→  cleanupDamageNumbers: () => {
+   529→    const now = Date.now();
+   530→    set(state => ({
+   531→      damageNumbers: state.damageNumbers.filter(dn => now - dn.timestamp < 2000),
+   532→    }));
+   533→  },
+   534→
+   535→  addToInventory: (itemId, quantity) => {
+   536→    set(state => {
+   537→      if (!state.player) return state;
+   538→      const itemDef = ITEMS[itemId];
+   539→      const inventory = [...state.player.inventory];
+   540→
+   541→      if (itemDef?.stackable) {
+   542→        const existing = inventory.find(i => i.itemId === itemId);
+   543→        if (existing) {
+   544→          existing.quantity += quantity;
+   545→        } else {
+   546→          inventory.push({
+   547→            id: generateLootId(),
+   548→            itemId,
+   549→            quantity,
+   550→            slot: inventory.length,
+   551→          });
+   552→        }
+   553→      } else {
+   554→        for (let i = 0; i < quantity; i++) {
+   555→          inventory.push({
+   556→            id: generateLootId(),
+   557→            itemId,
+   558→            quantity: 1,
+   559→            slot: inventory.length,
+   560→          });
+   561→        }
+   562→      }
+   563→
+   564→      return { player: { ...state.player, inventory } };
+   565→    });
+   566→  },
+   567→
+   568→  removeFromInventory: (invItemId, quantity) => {
+   569→    set(state => {
+   570→      if (!state.player) return state;
+   571→      const inventory = state.player.inventory.map(item => {
+   572→        if (item.id === invItemId) {
+   573→          const newQty = item.quantity - quantity;
+   574→          return newQty > 0 ? { ...item, quantity: newQty } : null;
+   575→        }
+   576→        return item;
+   577→      }).filter(Boolean) as InventoryItem[];
+   578→
+   579→      return { player: { ...state.player, inventory } };
+   580→    });
+   581→  },
+   582→
+   583→  consumeInventoryItem: (invItemId) => {
+   584→    const { player, addChatMessage, addDamageNumber } = get();
+   585→    if (!player) return;
+   586→
+   587→    const invItem = player.inventory.find(i => i.id === invItemId);
+   588→    if (!invItem) return;
+   589→
+   590→    const result = consumeItem(invItem.itemId, player.stats, player.inventory);
+   591→    if (result.used) {
+   592→      set(state => ({
+   593→        player: state.player ? {
+   594→          ...state.player,
+   595→          stats: result.stats,
+   596→          inventory: result.inventory,
+   597→        } : null,
+   598→      }));
+   599→      addChatMessage({ type: 'system', sender: 'Item', content: result.message, color: '#2ecc71' });
+   600→      if (result.stats.health > player.stats.health) {
+   601→        addDamageNumber(player.position, result.stats.health - player.stats.health, 'heal');
+   602→      }
+   603→    } else {
+   604→      addChatMessage({ type: 'system', sender: 'Item', content: result.message, color: '#e74c3c' });
+   605→    }
+   606→  },
+   607→
+   608→  equipItem: (invItemId) => {
+   609→    const { player, addChatMessage } = get();
+   610→    if (!player) return;
+   611→
+   612→    const invItem = player.inventory.find(i => i.id === invItemId);
+   613→    if (!invItem) return;
+   614→
+   615→    const itemDef = ITEMS[invItem.itemId];
+   616→    if (!itemDef) return;
+   617→
+   618→    // Check vocation requirement
+   619→    if (itemDef.vocationReq && !itemDef.vocationReq.includes(player.vocation)) {
+   620→      addChatMessage({ type: 'system', sender: 'System', content: `Only ${itemDef.vocationReq.join('/')}s can equip this.`, color: '#e74c3c' });
+   621→      return;
+   622→    }
+   623→
+   624→    // Check level requirement
+   625→    if (player.stats.level < itemDef.levelReq) {
+   626→      addChatMessage({ type: 'system', sender: 'System', content: `You need level ${itemDef.levelReq} to equip this.`, color: '#e74c3c' });
+   627→      return;
+   628→    }
+   629→
+   630→    // Determine slot
+   631→    const slotMap: Record<string, EquipSlot> = {
+   632→      [EquipSlot.WEAPON]: EquipSlot.WEAPON,
+   633→      [EquipSlot.ARMOR]: EquipSlot.ARMOR,
+   634→      [EquipSlot.SHIELD]: EquipSlot.SHIELD,
+   635→      [EquipSlot.HELMET]: EquipSlot.HELMET,
+   636→      [EquipSlot.LEGS]: EquipSlot.LEGS,
+   637→      [EquipSlot.BOOTS]: EquipSlot.BOOTS,
+   638→      [EquipSlot.RING]: EquipSlot.RING,
+   639→      [EquipSlot.AMULET]: EquipSlot.AMULET,
+   640→    };
+   641→
+   642→    const slot = slotMap[itemDef.type];
+   643→    if (!slot) {
+   644→      addChatMessage({ type: 'system', sender: 'System', content: 'This item cannot be equipped.', color: '#e74c3c' });
+   645→      return;
+   646→    }
+   647→
+   648→    // Swap equipment
+   649→    const currentEquipped = player.equipment[slot];
+   650→    const newEquipment = { ...player.equipment };
+   651→    newEquipment[slot] = invItem.itemId;
+   652→
+   653→    const newInventory = player.inventory.filter(i => i.id !== invItemId);
+   654→    if (currentEquipped) {
+   655→      newInventory.push({ id: generateLootId(), itemId: currentEquipped, quantity: 1, slot: newInventory.length });
+   656→    }
+   657→
+   658→    set(state => ({
+   659→      player: state.player ? {
+   660→        ...state.player,
+   661→        equipment: newEquipment,
+   662→        inventory: newInventory,
+   663→      } : null,
+   664→    }));
+   665→
+   666→    addChatMessage({ type: 'system', sender: 'Equipment', content: `Equipped ${itemDef.name}.`, color: '#3498db' });
+   667→  },
+   668→
+   669→  unequipItem: (slot) => {
+   670→    const { player, addChatMessage } = get();
+   671→    if (!player) return;
+   672→
+   673→    const equippedItemId = player.equipment[slot];
+   674→    if (!equippedItemId) return;
+   675→
+   676→    const itemDef = ITEMS[equippedItemId];
+   677→    if (!itemDef) return;
+   678→
+   679→    const newEquipment = { ...player.equipment };
+   680→    newEquipment[slot] = null;
+   681→
+   682→    const newInventory = [...player.inventory, {
+   683→      id: generateLootId(),
+   684→      itemId: equippedItemId,
+   685→      quantity: 1,
+   686→      slot: player.inventory.length,
+   687→    }];
+   688→
+   689→    set(state => ({
+   690→      player: state.player ? {
+   691→        ...state.player,
+   692→        equipment: newEquipment,
+   693→        inventory: newInventory,
+   694→      } : null,
+   695→    }));
+   696→
+   697→    addChatMessage({ type: 'system', sender: 'Equipment', content: `Unequipped ${itemDef.name}.`, color: '#3498db' });
+   698→  },
+   699→
+   700→  activeNPC: null,
+   701→  setActiveNPC: (npc) => set({ activeNPC: npc }),
+   702→
+   703→  buyItem: (itemId) => {
+   704→    const { player, addChatMessage } = get();
+   705→    if (!player) return;
+   706→
+   707→    const itemDef = ITEMS[itemId];
+   708→    if (!itemDef) return;
+   709→
+   710→    if (player.gold < itemDef.buyPrice) {
+   711→      addChatMessage({ type: 'system', sender: 'Merchant', content: "You don't have enough gold!", color: '#e74c3c' });
+   712→      return;
+   713→    }
+   714→
+   715→    // Add to inventory and deduct gold
+   716→    set(state => {
+   717→      if (!state.player) return state;
+   718→      const newInventory = [...state.player.inventory];
+   719→      if (itemDef.stackable) {
+   720→        const existing = newInventory.find(i => i.itemId === itemId);
+   721→        if (existing) {
+   722→          existing.quantity += 1;
+   723→        } else {
+   724→          newInventory.push({ id: generateLootId(), itemId, quantity: 1, slot: newInventory.length });
+   725→        }
+   726→      } else {
+   727→        newInventory.push({ id: generateLootId(), itemId, quantity: 1, slot: newInventory.length });
+   728→      }
+   729→      return {
+   730→        player: {
+   731→          ...state.player,
+   732→          gold: state.player.gold - itemDef.buyPrice,
+   733→          inventory: newInventory,
+   734→        },
+   735→      };
+   736→    });
+   737→
+   738→    addChatMessage({ type: 'system', sender: 'Merchant', content: `Bought ${itemDef.name} for ${itemDef.buyPrice} gold.`, color: '#2ecc71' });
+   739→  },
+   740→
+   741→  playerDeath: () => {
+   742→    const { player, addChatMessage } = get();
+   743→    if (!player) return;
+   744→    set(state => ({
+   745→      player: state.player ? {
+   746→        ...state.player,
+   747→        stats: {
+   748→          ...state.player.stats,
+   749→          health: 0,
+   750→        },
+   751→      } : null,
+   752→      screen: 'dead' as GameScreen,
+   753→    }));
+   754→    addChatMessage({
+   755→      type: 'system',
+   756→      sender: 'System',
+   757→      content: 'You have died! Press Respawn to return to town.',
+   758→      color: '#e74c3c',
+   759→    });
+   760→  },
+   761→
+   762→  respawn: () => {
+   763→    const { player, gameMap, addChatMessage } = get();
+   764→    if (!player) return;
+   765→    const newStats = calculateStats(player.vocation, player.stats.level);
+   766→    // Lose 10% experience on death
+   767→    const xpLost = Math.floor(player.stats.experience * 0.1);
+   768→    const newExp = Math.max(0, player.stats.experience - xpLost);
+   769→    set(state => ({
+   770→      player: state.player ? {
+   771→        ...state.player,
+   772→        position: { ...gameMap.spawnPoint },
+   773→        stats: {
+   774→          ...newStats,
+   775→          experience: newExp,
+   776→          experienceToNext: state.player.stats.experienceToNext,
+   777→        },
+   778→      } : null,
+   779→      screen: 'game' as GameScreen,
+   780→    }));
+   781→    addChatMessage({
+   782→      type: 'system',
+   783→      sender: 'System',
+   784→      content: `You have been resurrected at the town spawn.${xpLost > 0 ? ` Lost ${xpLost} XP.` : ''}`,
+   785→      color: '#2ecc71',
+   786→    });
+   787→  },
+   788→
+   789→  regenMana: (deltaTime) => {
+   790→    set(state => {
+   791→      if (!state.player) return state;
+   792→      const { mana, maxMana } = state.player.stats;
+   793→      if (mana >= maxMana) return state;
+   794→      const regenAmount = Math.min(1 + state.player.stats.level * 0.2, maxMana - mana);
+   795→      const regen = regenAmount * (deltaTime / 1000);
+   796→      return {
+   797→        player: {
+   798→          ...state.player,
+   799→          stats: {
+   800→            ...state.player.stats,
+   801→            mana: Math.min(maxMana, mana + regen),
+   802→          },
+   803→        },
+   804→      };
+   805→    });
+   806→  },
+   807→}));
+   808→
+   809→function isMonsterAt(x: number, y: number, monsters: MonsterInstance[], excludeId?: string): boolean {
+   810→  return monsters.some(m =>
+   811→    !m.isDead &&
+   812→    m.position.x === x &&
+   813→    m.position.y === y &&
+   814→    m.id !== excludeId
+   815→  );
+   816→}

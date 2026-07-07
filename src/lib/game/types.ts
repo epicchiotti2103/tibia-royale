@@ -246,6 +246,19 @@ export interface DamageNumber {
   timestamp: number;
 }
 
+export interface SpellEffect {
+  id: string;
+  type: 'sword_slash' | 'projectile' | 'explosion' | 'heal_aura' | 'whirlwind' | 'lightning' | 'earthquake' | 'war_cry';
+  position: Position;
+  direction?: Direction;
+  targetPosition?: Position;
+  color: string;
+  startTime: number;
+  duration: number;
+  size?: number;
+  damage?: number;
+}
+
 export interface GameMap {
   tiles: TileType[][];
   spawnPoint: Position;
@@ -253,6 +266,14 @@ export interface GameMap {
   monsterZones: MonsterZone[];
   name: string;
 }
+
+// Direction offsets
+export const DIR_OFFSETS: Record<Direction, Position> = {
+  [Direction.NORTH]: { x: 0, y: -1 },
+  [Direction.EAST]: { x: 1, y: 0 },
+  [Direction.SOUTH]: { x: 0, y: 1 },
+  [Direction.WEST]: { x: -1, y: 0 },
+};
 
 export interface MonsterZone {
   id: string;

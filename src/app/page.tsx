@@ -196,7 +196,7 @@ export default function HomePage() {
 
       {/* Controls hint */}
       <div className="absolute bottom-2 right-2 z-10 bg-black/60 rounded px-2 py-1 text-[10px] text-gray-500">
-        WASD: Move | Space: Attack | E: Interact | 1-9: Skills | I: Inventory
+        WASD: Move | Space/Click: Attack | F1-F4: Skills | 1-9: Items | E: NPC | I: Inv
       </div>
     </div>
   );
