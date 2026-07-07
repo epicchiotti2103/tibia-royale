@@ -29,7 +29,7 @@ import {
   generateLoot,
 } from '@/lib/game/combat';
 
-export type GameScreen = 'login' | 'game';
+export type GameScreen = 'login' | 'game' | 'dead';
 
 interface GameState {
   // Screen
@@ -402,6 +402,12 @@ export const useGameStore = create<GameState>((set, get) => ({
           content: `You defeated ${def.name}! +${def.experience} XP`,
           color: '#f1c40f',
         });
+
+        // Track quest kills
+        if (typeof window !== 'undefined' && (window as any).__questTrackKill) {
+          (window as any).__questTrackKill(targetMonster.definitionId);
+        }
+
         addDamageNumber(targetMonster.position, def.experience, 'xp');
 
         // Generate loot
@@ -743,12 +749,12 @@ export const useGameStore = create<GameState>((set, get) => ({
           health: 0,
         },
       } : null,
-      screen: 'login' as GameScreen,
+      screen: 'dead' as GameScreen,
     }));
     addChatMessage({
       type: 'system',
       sender: 'System',
-      content: 'You have died. Your adventure ends here... for now.',
+      content: 'You have died! Press Respawn to return to town.',
       color: '#e74c3c',
     });
   },
@@ -757,21 +763,25 @@ export const useGameStore = create<GameState>((set, get) => ({
     const { player, gameMap, addChatMessage } = get();
     if (!player) return;
     const newStats = calculateStats(player.vocation, player.stats.level);
+    // Lose 10% experience on death
+    const xpLost = Math.floor(player.stats.experience * 0.1);
+    const newExp = Math.max(0, player.stats.experience - xpLost);
     set(state => ({
       player: state.player ? {
         ...state.player,
         position: { ...gameMap.spawnPoint },
         stats: {
           ...newStats,
-          experience: state.player.stats.experience,
+          experience: newExp,
           experienceToNext: state.player.stats.experienceToNext,
         },
       } : null,
+      screen: 'game' as GameScreen,
     }));
     addChatMessage({
       type: 'system',
       sender: 'System',
-      content: 'You have been resurrected at the town spawn.',
+      content: `You have been resurrected at the town spawn.${xpLost > 0 ? ` Lost ${xpLost} XP.` : ''}`,
       color: '#2ecc71',
     });
   },

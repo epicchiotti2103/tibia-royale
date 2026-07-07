@@ -4,12 +4,8 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import { useGameStore } from '@/store/game-store';
 import {
   TILE_SIZE,
-  VIEWPORT_TILES_X,
-  VIEWPORT_TILES_Y,
   TileType,
   Direction,
-  WALKABLE_TILES,
-  SOLID_TILES,
   TILE_COLORS,
   DamageNumber,
 } from '@/lib/game/types';
@@ -464,6 +460,44 @@ export default function GameCanvas() {
     drawPlayerSprite(ctx, currentPlayer.name, playerScreenX, playerScreenY, currentPlayer.direction, '#e67e22', currentPlayer.stats.level, currentPlayer.stats.health, currentPlayer.stats.maxHealth);
 
     renderDamageNumbers(ctx, currentDmgNumbers, camX, camY);
+
+    // Day/Night cycle overlay
+    const gameMinutes = Date.now() / 100;
+    const totalGameHours = (gameMinutes / 60) % 24;
+    let nightAlpha = 0;
+    if (totalGameHours >= 21 || totalGameHours < 6) {
+      nightAlpha = 0.35; // Night
+    } else if (totalGameHours >= 18) {
+      nightAlpha = 0.15 + (totalGameHours - 18) / 3 * 0.2; // Evening transition
+    } else if (totalGameHours < 8) {
+      nightAlpha = 0.35 - (totalGameHours - 6) / 2 * 0.35; // Morning transition
+    }
+    if (nightAlpha > 0) {
+      ctx.fillStyle = `rgba(10, 10, 40, ${nightAlpha})`;
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    }
+
+    // Area name indicator
+    const px = currentPlayer.position.x;
+    const py = currentPlayer.position.y;
+    let areaName = '';
+    let areaColor = '#fff';
+    if (px >= 34 && px <= 66 && py >= 34 && py <= 61) { areaName = '🏛️ Tibia Town (Safe Zone)'; areaColor = '#f1c40f'; }
+    else if (px >= 5 && px <= 95 && py >= 2 && py <= 30) { areaName = '🌲 Northern Forest'; areaColor = '#2ecc71'; }
+    else if (px >= 5 && px <= 95 && py >= 65 && py <= 98) { areaName = '🌿 Southern Swamp'; areaColor = '#27ae60'; }
+    else if (px >= 2 && px <= 32 && py >= 5 && py <= 63) { areaName = '🏜️ Western Desert'; areaColor = '#e67e22'; }
+    else if (px >= 70 && px <= 98 && py >= 5 && py <= 63) { areaName = '⛰️ Eastern Mountains'; areaColor = '#95a5a6'; }
+    else if (px >= 2 && px <= 12 && py >= 88 && py <= 98) { areaName = '🔥 Lava Fields (BOSS)'; areaColor = '#e74c3c'; }
+    else if (px >= 88 && px <= 98 && py >= 88 && py <= 98) { areaName = '🐉 Dark Forest (LEGEND)'; areaColor = '#c0392b'; }
+
+    if (areaName) {
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillText(areaName, canvasWidth / 2 + 1, 21);
+      ctx.fillStyle = areaColor;
+      ctx.fillText(areaName, canvasWidth / 2, 20);
+    }
   }, []);
 
   // Game loop ref to avoid self-reference

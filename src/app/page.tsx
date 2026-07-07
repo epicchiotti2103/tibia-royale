@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useGameStore } from '@/store/game-store';
 import GameCanvas from '@/components/game/GameCanvas';
@@ -10,6 +10,9 @@ import InventoryPanel from '@/components/game/InventoryPanel';
 import Minimap from '@/components/game/Minimap';
 import NPCDialog from '@/components/game/NPCDialog';
 import GameLogin from '@/components/game/GameLogin';
+import DeathScreen from '@/components/game/DeathScreen';
+import SkillsPanel from '@/components/game/SkillsPanel';
+import QuestLog from '@/components/game/QuestLog';
 
 export default function HomePage() {
   const screen = useGameStore((s) => s.screen);
@@ -19,7 +22,6 @@ export default function HomePage() {
   const addChatMessage = useGameStore((s) => s.addChatMessage);
   const setOtherPlayers = useGameStore((s) => s.setOtherPlayers);
   const socketRef = useRef<Socket | null>(null);
-  const lastPosBroadcast = useRef(0);
 
   // Connect to game server
   useEffect(() => {
@@ -37,7 +39,6 @@ export default function HomePage() {
 
     socket.on('connect', () => {
       console.log('Connected to game server');
-      // Send player info
       socket.emit('join-game', {
         name: player.name,
         position: player.position,
@@ -112,37 +113,38 @@ export default function HomePage() {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [screen, player?.id]);
+  }, [screen === 'game']);
 
   // Broadcast position periodically
   useEffect(() => {
     if (screen !== 'game' || !player) return;
 
     const interval = setInterval(() => {
-      if (socketRef.current && player) {
+      const currentPlayer = useGameStore.getState().player;
+      if (socketRef.current && currentPlayer) {
         socketRef.current.emit('player-move', {
-          position: player.position,
-          direction: player.direction,
+          position: currentPlayer.position,
+          direction: currentPlayer.direction,
         });
         socketRef.current.emit('player-stats', {
-          health: player.stats.health,
-          maxHealth: player.stats.maxHealth,
-          level: player.stats.level,
+          health: currentPlayer.stats.health,
+          maxHealth: currentPlayer.stats.maxHealth,
+          level: currentPlayer.stats.level,
         });
       }
     }, 500);
 
     return () => clearInterval(interval);
-  }, [screen, player?.position?.x, player?.position?.y]);
+  }, [screen === 'game']);
 
   // Broadcast chat messages
-  const originalAddChatMessage = useGameStore.getState().addChatMessage;
   useEffect(() => {
     const unsub = useGameStore.subscribe(
       (state) => state.chatMessages,
       (messages) => {
         const lastMsg = messages[messages.length - 1];
-        if (lastMsg && lastMsg.type === 'player' && socketRef.current && player) {
+        const currentPlayer = useGameStore.getState().player;
+        if (lastMsg && lastMsg.type === 'player' && socketRef.current && currentPlayer) {
           socketRef.current.emit('chat-message', {
             sender: lastMsg.sender,
             content: lastMsg.content,
@@ -152,7 +154,7 @@ export default function HomePage() {
       }
     );
     return unsub;
-  }, [player?.id]);
+  }, []);
 
   if (screen === 'login') {
     return <GameLogin />;
@@ -166,24 +168,70 @@ export default function HomePage() {
       {/* HUD Overlay */}
       <GameHUD />
 
-      {/* Minimap */}
-      <div className="absolute top-12 right-0 z-10 mr-2">
+      {/* Minimap - positioned properly */}
+      <div className="absolute top-14 right-2 z-10">
         <Minimap />
       </div>
 
-      {/* Chat Panel */}
+      {/* Quest Log - right side */}
+      <QuestLog />
+
+      {/* Chat Panel - bottom left */}
       <ChatPanel />
 
-      {/* Inventory Panel */}
+      {/* Inventory Panel - top right */}
       <InventoryPanel />
+
+      {/* Skills Bar - bottom center */}
+      <SkillsPanel />
 
       {/* NPC Dialog */}
       <NPCDialog />
 
+      {/* Death Screen Overlay */}
+      {screen === 'dead' && <DeathScreen />}
+
+      {/* Time of day indicator */}
+      <TimeIndicator />
+
       {/* Controls hint */}
       <div className="absolute bottom-2 right-2 z-10 bg-black/60 rounded px-2 py-1 text-[10px] text-gray-500">
-        WASD: Move | Space: Attack | E: Interact | 1-9: Use Items
+        WASD: Move | Space: Attack | E: Interact | 1-9: Skills | I: Inventory
       </div>
+    </div>
+  );
+}
+
+function TimeIndicator() {
+  const [time, setTime] = React.useState('');
+
+  React.useEffect(() => {
+    const updateTime = () => {
+      const gameMinutes = Date.now() / 100; // 1 real second = ~10 game minutes
+      const totalGameHours = (gameMinutes / 60) % 24;
+      const hours = Math.floor(totalGameHours);
+      const minutes = Math.floor((totalGameHours - hours) * 60);
+
+      let period: string;
+      let icon: string;
+      if (hours >= 6 && hours < 12) { period = 'Morning'; icon = '🌅'; }
+      else if (hours >= 12 && hours < 18) { period = 'Afternoon'; icon = '☀️'; }
+      else if (hours >= 18 && hours < 21) { period = 'Evening'; icon = '🌇'; }
+      else { period = 'Night'; icon = '🌙'; }
+
+      setTime(`${icon} ${period} ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`);
+    };
+
+    updateTime();
+    const interval = setInterval(updateTime, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!time) return null;
+
+  return (
+    <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-black/60 border border-amber-700/30 rounded-lg px-3 py-1 text-amber-200/80 text-xs font-mono">
+      {time}
     </div>
   );
 }
