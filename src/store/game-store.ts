@@ -79,6 +79,11 @@ interface GameState {
   skillCooldowns: Record<string, number>;
   buffEndTime: number;
 
+  // Visual feedback
+  screenShakeTime: number;
+  levelUpTime: number;
+  lastAutoAttackTime: number;
+
   // Inventory
   addToInventory: (itemId: string, quantity: number) => void;
   removeFromInventory: (invItemId: string, quantity: number) => void;
@@ -267,6 +272,8 @@ export const useGameStore = create<GameState>((set, get) => ({
             addDamageNumber(player.position, 0, 'miss');
           } else {
             addDamageNumber(player.position, -result.damage, 'damage');
+            // Screen shake when hit
+            set({ screenShakeTime: now });
           }
 
           // Update player health
@@ -489,6 +496,7 @@ export const useGameStore = create<GameState>((set, get) => ({
                   mana: newStats.maxMana,
                 },
               },
+              levelUpTime: Date.now(),
             };
           }
 
@@ -568,6 +576,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   spellEffects: [],
   skillCooldowns: {},
   buffEndTime: 0,
+  screenShakeTime: 0,
+  levelUpTime: 0,
+  lastAutoAttackTime: 0,
   addSpellEffect: (effect) => {
     const ef: SpellEffect = {
       ...effect,
@@ -733,7 +744,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           if (leveledUp) {
             const newStats = calculateStats(state.player.vocation, newLevel);
             addChatMessage({ type: 'system', sender: 'Level Up!', content: `🎉 Level ${newLevel}!`, color: '#f1c40f' });
-            return { player: { ...state.player, stats: { ...newStats, experience: newExp - state.player.stats.experienceToNext, health: newStats.maxHealth, mana: newStats.maxMana } } };
+            return { player: { ...state.player, stats: { ...newStats, experience: newExp - state.player.stats.experienceToNext, health: newStats.maxHealth, mana: newStats.maxMana } }, levelUpTime: Date.now() };
           }
           return { player: { ...state.player, stats: { ...state.player.stats, experience: newExp } } };
         });

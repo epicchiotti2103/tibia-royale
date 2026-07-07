@@ -144,6 +144,80 @@ export default function SkillsPanel() {
             ⚔️ ATK+
           </div>
         )}
+
+        {/* Separator */}
+        <div className="w-px h-8 bg-gray-600/30 mx-1 self-center" />
+
+        {/* Quick potion slots */}
+        <QuickPotionSlot type="hp" />
+        <QuickPotionSlot type="mp" />
+      </div>
+    </div>
+  );
+}
+
+function QuickPotionSlot({ type }: { type: 'hp' | 'mp' }) {
+  const player = useGameStore((s) => s.player);
+  const consumeInventoryItem = useGameStore((s) => s.consumeInventoryItem);
+
+  if (!player) return null;
+
+  const isHP = type === 'hp';
+  const count = player.inventory
+    .filter(i => isHP ? i.itemId.startsWith('health_potion') : i.itemId.startsWith('mana_potion'))
+    .reduce((sum, i) => sum + i.quantity, 0);
+
+  const handleUse = () => {
+    // Find best available potion
+    const potions = player.inventory.filter(i =>
+      isHP ? i.itemId.startsWith('health_potion') : i.itemId.startsWith('mana_potion')
+    ).sort((a, b) => {
+      // Prefer larger potions
+      const order = isHP
+        ? ['health_potion_large', 'health_potion_medium', 'health_potion_small']
+        : ['mana_potion_large', 'mana_potion_medium', 'mana_potion_small'];
+      return order.indexOf(a.itemId) - order.indexOf(b.itemId);
+    });
+
+    if (potions.length > 0) {
+      consumeInventoryItem(potions[0].id);
+    }
+  };
+
+  const isDisabled = count === 0;
+  const isNeeded = isHP
+    ? player.stats.health < player.stats.maxHealth * 0.8
+    : player.stats.mana < player.stats.maxMana * 0.5;
+
+  return (
+    <div className="relative group">
+      <button
+        onClick={handleUse}
+        disabled={isDisabled}
+        className={`w-12 h-12 rounded-lg border-2 flex flex-col items-center justify-center transition-all relative overflow-hidden
+          ${isDisabled ? 'border-gray-700 bg-gray-900/50 opacity-40 cursor-not-allowed' :
+            isNeeded ? 'border-green-600 bg-gray-900/90 hover:bg-gray-800 hover:border-green-400 cursor-pointer hover:scale-110 active:scale-95 animate-pulse' :
+            'border-gray-600 bg-gray-900/90 hover:bg-gray-800 hover:border-gray-400 cursor-pointer hover:scale-110 active:scale-95'}`}
+      >
+        <span className="text-xl leading-none">{isHP ? '❤️' : '💧'}</span>
+        <span className="text-[8px] text-gray-300 leading-none mt-0.5 font-bold">{count > 0 ? `Q${isHP ? '1' : '2'}` : '--'}</span>
+        {count > 0 && (
+          <div className="absolute top-0.5 right-1 text-[7px] text-white font-bold bg-black/50 rounded px-0.5">
+            {count}
+          </div>
+        )}
+      </button>
+      <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50">
+        <div className="bg-gray-900 border border-gray-600 rounded-lg p-2 w-40 shadow-xl">
+          <div className="font-bold text-sm" style={{ color: isHP ? '#e74c3c' : '#3498db' }}>
+            {isHP ? '❤️ Health Potion' : '💧 Mana Potion'}
+          </div>
+          <div className="text-[10px] text-gray-400 mt-1">
+            {count > 0 ? `${count} potion${count > 1 ? 's' : ''} available` : 'No potions!'}
+          </div>
+          <div className="text-[10px] text-amber-300 mt-1">Press <span className="text-amber-100 font-bold">Q{isHP ? '1' : '2'}</span> or click</div>
+          <div className="text-[10px] text-gray-500 mt-1">Uses best available potion</div>
+        </div>
       </div>
     </div>
   );

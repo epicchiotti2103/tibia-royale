@@ -715,6 +715,144 @@ function renderSpellEffects(
 }
 
 // =============================================
+// Level up celebration rendering
+// =============================================
+function renderLevelUpCelebration(
+  ctx: CanvasRenderingContext2D,
+  canvasWidth: number,
+  canvasHeight: number,
+  levelUpTime: number
+) {
+  const elapsed = Date.now() - levelUpTime;
+  if (elapsed > 2500) return;
+
+  const progress = elapsed / 2500;
+  const alpha = progress < 0.2 ? progress / 0.2 : progress > 0.7 ? (1 - progress) / 0.3 : 1;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  // Golden radial burst
+  const cx = canvasWidth / 2;
+  const cy = canvasHeight / 2 - 40;
+  const burstRadius = 80 + progress * 60;
+
+  for (let i = 0; i < 12; i++) {
+    const angle = (i / 12) * Math.PI * 2 + progress * 2;
+    const rayLen = burstRadius * (0.6 + Math.sin(progress * 10 + i) * 0.4);
+    ctx.strokeStyle = `hsl(${45 + i * 3}, 100%, ${60 + progress * 20}%)`;
+    ctx.lineWidth = 3 - progress * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(angle) * rayLen, cy + Math.sin(angle) * rayLen);
+    ctx.stroke();
+  }
+
+  // Rising golden particles
+  for (let i = 0; i < 20; i++) {
+    const angle = (i / 20) * Math.PI * 2;
+    const r = 30 + progress * 80;
+    const px = cx + Math.cos(angle + progress * 3) * r;
+    const py = cy + Math.sin(angle + progress * 3) * r - progress * 60;
+    const size = 3 * (1 - progress);
+    ctx.fillStyle = `hsl(${40 + i * 5}, 100%, 70%)`;
+    ctx.globalAlpha = alpha * (1 - progress) * 0.8;
+    ctx.beginPath();
+    ctx.arc(px, py, size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // "LEVEL UP!" text
+  ctx.globalAlpha = alpha;
+  ctx.font = `bold ${28 + Math.sin(progress * 8) * 4}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = '#f1c40f';
+  ctx.shadowBlur = 20;
+  ctx.strokeStyle = '#8B6914';
+  ctx.lineWidth = 4;
+  ctx.strokeText('⭐ LEVEL UP! ⭐', cx, cy);
+  ctx.fillStyle = '#f1c40f';
+  ctx.fillText('⭐ LEVEL UP! ⭐', cx, cy);
+  ctx.shadowBlur = 0;
+
+  ctx.restore();
+}
+
+// =============================================
+// Target reticle rendering
+// =============================================
+function renderTargetReticle(
+  ctx: CanvasRenderingContext2D,
+  playerX: number,
+  playerY: number,
+  direction: Direction,
+  monsters: { id: string; position: { x: number; y: number }; isDead: boolean; definitionId: string }[],
+  camX: number,
+  camY: number
+) {
+  const dirOff = DIR_OFFSETS[direction];
+
+  // Check monsters in front
+  for (const m of monsters) {
+    if (m.isDead) continue;
+    const dx = m.position.x - playerX;
+    const dy = m.position.y - playerY;
+    const dist = Math.max(Math.abs(dx), Math.abs(dy));
+
+    if (dist > 5) continue; // only show reticle for nearby monsters
+
+    // Check if monster is in the direction player faces (with some tolerance)
+    const dotProduct = dx * dirOff.x + dy * dirOff.y;
+    if (dotProduct <= 0 && dist > 1) continue; // allow adjacent regardless of direction
+
+    const mx = m.position.x * TILE_SIZE + TILE_SIZE / 2 - camX;
+    const my = m.position.y * TILE_SIZE + TILE_SIZE / 2 - camY;
+
+    // Pulsing red targeting reticle
+    const time = Date.now() / 300;
+    const pulse = 0.6 + Math.sin(time) * 0.3;
+
+    ctx.save();
+    ctx.strokeStyle = `rgba(255, 50, 50, ${pulse})`;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]);
+
+    // Corner brackets
+    const s = 18;
+    const c = 5;
+    // Top-left
+    ctx.beginPath();
+    ctx.moveTo(mx - s, my - s + c); ctx.lineTo(mx - s, my - s); ctx.lineTo(mx - s + c, my - s);
+    ctx.stroke();
+    // Top-right
+    ctx.beginPath();
+    ctx.moveTo(mx + s - c, my - s); ctx.lineTo(mx + s, my - s); ctx.lineTo(mx + s, my - s + c);
+    ctx.stroke();
+    // Bottom-left
+    ctx.beginPath();
+    ctx.moveTo(mx - s, my + s - c); ctx.lineTo(mx - s, my + s); ctx.lineTo(mx - s + c, my + s);
+    ctx.stroke();
+    // Bottom-right
+    ctx.beginPath();
+    ctx.moveTo(mx + s - c, my + s); ctx.lineTo(mx + s, my + s); ctx.lineTo(mx + s, my + s - c);
+    ctx.stroke();
+
+    ctx.setLineDash([]);
+
+    // Highlight the closest one
+    if (dist <= 1) {
+      ctx.strokeStyle = `rgba(255, 80, 80, ${pulse * 0.4})`;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(mx - s - 2, my - s - 2, (s + 2) * 2, (s + 2) * 2);
+    }
+
+    ctx.restore();
+    break; // only show reticle on one monster (closest in direction)
+  }
+}
+
+// =============================================
 // Main Game Canvas Component
 // =============================================
 export default function GameCanvas() {
@@ -751,13 +889,25 @@ export default function GameCanvas() {
     const currentDmgNumbers = useGameStore.getState().damageNumbers;
     const currentSpellEffects = useGameStore.getState().spellEffects;
     const currentBuffEnd = useGameStore.getState().buffEndTime;
+    const screenShakeTime = useGameStore.getState().screenShakeTime;
+    const levelUpTime = useGameStore.getState().levelUpTime;
     if (!ctx || !currentPlayer) return;
 
     const canvasWidth = canvas.width;
     const canvasHeight = canvas.height;
 
-    const camX = currentPlayer.position.x * TILE_SIZE - canvasWidth / 2 + TILE_SIZE / 2;
-    const camY = currentPlayer.position.y * TILE_SIZE - canvasHeight / 2 + TILE_SIZE / 2;
+    // Screen shake offset
+    let shakeX = 0;
+    let shakeY = 0;
+    const shakeElapsed = Date.now() - screenShakeTime;
+    if (shakeElapsed < 300) {
+      const intensity = (1 - shakeElapsed / 300) * 6;
+      shakeX = (Math.random() - 0.5) * intensity * 2;
+      shakeY = (Math.random() - 0.5) * intensity * 2;
+    }
+
+    const camX = currentPlayer.position.x * TILE_SIZE - canvasWidth / 2 + TILE_SIZE / 2 + shakeX;
+    const camY = currentPlayer.position.y * TILE_SIZE - canvasHeight / 2 + TILE_SIZE / 2 + shakeY;
 
     ctx.fillStyle = '#1a1a2e';
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
@@ -798,9 +948,49 @@ export default function GameCanvas() {
     }
 
     for (const monster of currentMonsters) {
-      if (monster.isDead) continue;
       const def = MONSTERS[monster.definitionId];
       if (!def) continue;
+
+      // Death fade animation
+      if (monster.isDead) {
+        if (!monster.deathTime) continue;
+        const deathAge = Date.now() - monster.deathTime;
+        if (deathAge > 1500) continue; // fully faded
+
+        const screenX = monster.position.x * TILE_SIZE - camX;
+        const screenY = monster.position.y * TILE_SIZE - camY;
+        if (screenX > -TILE_SIZE && screenX < canvasWidth && screenY > -TILE_SIZE && screenY < canvasHeight) {
+          const fadeAlpha = 1 - deathAge / 1500;
+          const shrinkScale = 1 - (deathAge / 1500) * 0.5;
+          ctx.save();
+          ctx.globalAlpha = fadeAlpha;
+          ctx.translate(screenX + TILE_SIZE / 2, screenY + TILE_SIZE / 2);
+          ctx.scale(shrinkScale, shrinkScale);
+          ctx.translate(-(screenX + TILE_SIZE / 2), -(screenY + TILE_SIZE / 2));
+
+          // Red-tinted death sprite
+          const ts = TILE_SIZE;
+          const cx = screenX + ts / 2;
+          const cy = screenY + ts / 2;
+          ctx.fillStyle = '#666';
+          ctx.beginPath();
+          ctx.roundRect(cx - 10, cy - 6, 20, 18, 4);
+          ctx.fill();
+          // X eyes
+          ctx.strokeStyle = '#999';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(cx - 6, cy - 2); ctx.lineTo(cx - 2, cy + 2);
+          ctx.moveTo(cx - 2, cy - 2); ctx.lineTo(cx - 6, cy + 2);
+          ctx.moveTo(cx + 2, cy - 2); ctx.lineTo(cx + 6, cy + 2);
+          ctx.moveTo(cx + 6, cy - 2); ctx.lineTo(cx + 2, cy + 2);
+          ctx.stroke();
+
+          ctx.restore();
+        }
+        continue;
+      }
+
       const screenX = monster.position.x * TILE_SIZE - camX;
       const screenY = monster.position.y * TILE_SIZE - camY;
       if (screenX > -TILE_SIZE && screenX < canvasWidth && screenY > -TILE_SIZE && screenY < canvasHeight) {
@@ -825,6 +1015,9 @@ export default function GameCanvas() {
     renderSpellEffects(ctx, currentSpellEffects, camX, camY);
 
     renderDamageNumbers(ctx, currentDmgNumbers, camX, camY);
+
+    // Target reticle on monster in front of player
+    renderTargetReticle(ctx, currentPlayer.position.x, currentPlayer.position.y, currentPlayer.direction, currentMonsters, camX, camY);
 
     // Day/Night cycle overlay
     const gameMinutes = Date.now() / 100;
@@ -863,6 +1056,11 @@ export default function GameCanvas() {
       ctx.fillStyle = areaColor;
       ctx.fillText(areaName, canvasWidth / 2, 20);
     }
+
+    // Level up celebration
+    if (levelUpTime > 0) {
+      renderLevelUpCelebration(ctx, canvasWidth, canvasHeight, levelUpTime);
+    }
   }, []);
 
   // Game loop ref to avoid self-reference
@@ -895,6 +1093,16 @@ export default function GameCanvas() {
       store.updateMonsters(deltaTime);
       store.regenMana(deltaTime);
 
+      // Auto-attack when holding Space
+      if (keysPressed.current.has(' ')) {
+        const autoAttackDelay = 500; // ms between auto-attacks
+        const now = Date.now();
+        if (now - store.lastAutoAttackTime > autoAttackDelay) {
+          store.attackMonster();
+          useGameStore.setState({ lastAutoAttackTime: now });
+        }
+      }
+
       if (now % 500 < 20) {
         store.cleanupDamageNumbers();
         store.cleanupSpellEffects();
@@ -914,10 +1122,15 @@ export default function GameCanvas() {
       const key = e.key.toLowerCase();
       keysPressed.current.add(key);
 
-      // Space = physical attack with sword
+      // Space = physical attack with sword (also auto-attacks when held)
       if (key === ' ') {
         e.preventDefault();
-        useGameStore.getState().attackMonster();
+        const s = useGameStore.getState();
+        const now = Date.now();
+        if (now - s.lastAutoAttackTime > 500) {
+          s.attackMonster();
+          useGameStore.setState({ lastAutoAttackTime: now });
+        }
       }
       // E = interact with NPC
       if (key === 'e') {
@@ -929,6 +1142,25 @@ export default function GameCanvas() {
       if (key === 'f2') { e.preventDefault(); useGameStore.getState().castSkill(1); }
       if (key === 'f3') { e.preventDefault(); useGameStore.getState().castSkill(2); }
       if (key === 'f4') { e.preventDefault(); useGameStore.getState().castSkill(3); }
+
+      // Q1/Q2 = quick potions
+      if (key === 'q') {
+        e.preventDefault();
+        const s = useGameStore.getState();
+        if (s.player) {
+          // Use HP potion first if hurt, otherwise MP
+          const needHP = s.player.stats.health < s.player.stats.maxHealth * 0.8;
+          const potions = s.player.inventory.filter(i =>
+            needHP ? i.itemId.startsWith('health_potion') : i.itemId.startsWith('mana_potion')
+          ).sort((a, b) => {
+            const order = needHP
+              ? ['health_potion_large', 'health_potion_medium', 'health_potion_small']
+              : ['mana_potion_large', 'mana_potion_medium', 'mana_potion_small'];
+            return order.indexOf(a.itemId) - order.indexOf(b.itemId);
+          });
+          if (potions.length > 0) s.consumeInventoryItem(potions[0].id);
+        }
+      }
 
       // 1-9 = use inventory items
       const num = parseInt(key);

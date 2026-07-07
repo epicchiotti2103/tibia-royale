@@ -114,3 +114,29 @@ Stage Summary:
 - Cooldowns visuais com sweep circular
 - Buff visual (aura laranja) quando War Cry está ativo
 - Zero erros verificados no browser (Sorcerer + Druid testados)
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: Polimento visual - screen shake, level up, morte animada, retícula, poções rápidas, auto-attack
+
+Work Log:
+- Adicionou screenShakeTime, levelUpTime, lastAutoAttackTime ao game store
+- Screen shake: quando monstro acerta o jogador, câmera treme por 300ms com intensidade decrescente
+- Level up celebration: efeito visual grandão com raios dourados, partículas subindo, e texto "⭐ LEVEL UP! ⭐" pulsante (2.5s)
+- Animação de morte dos monstros: sprite fica cinza com olhos de X, fade-out + shrink ao longo de 1.5s
+- Retícula de alvo: brackets vermelhos pulsantes ao redor do monstro na direção do jogador (até 5 tiles)
+- Retícula mais forte (borda completa) para monstros adjacentes (distância 1)
+- Quick potion slots na skill bar: ❤️ Q1 (HP) e 💧 Q2 (MP) com contador de quantidade
+- Poções pulsam em verde quando o jogador precisa (HP < 80% ou MP < 50%)
+- Usa sempre a poção mais forte disponível (large > medium > small)
+- Botão mostra "--" quando sem poções e fica desabilitado
+- Hotkey Q: usa HP potion se machucado, senão MP potion
+- Auto-attack: segurar Space ataca automaticamente a cada 500ms
+- Controles atualizados: "WASD: Move | Space(hold): Attack | F1-F4: Skills | Q: Potion | 1-9: Items"
+
+Stage Summary:
+- 6 novos recursos visuais/de jogabilidade implementados
+- Screen shake, level up celebration, morte animada, retícula de alvo, poções rápidas, auto-attack
+- Zero erros de console verificados
+- Jogo significativamente mais polido e responsivo
