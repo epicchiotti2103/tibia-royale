@@ -101,117 +101,81 @@ function createPath(map: TileType[][], x1: number, y1: number, x2: number, y2: n
   }
 }
 
-// Simple seeded random for consistent maps
-function seededRandom(seed: number): () => number {
-  let s = seed;
-  return () => {
-    s = (s * 16807 + 0) % 2147483647;
-    return s / 2147483647;
-  };
-}
-
 export function generateGameMap(): GameMap {
   const map = createEmptyMap(100, 100);
 
   // ============ TOWN (center, safe area) ============
-  // Town area - stone floor
   fillRect(map, 35, 35, 30, 25, TileType.STONE_FLOOR);
-
-  // Town walls
   drawRect(map, 34, 34, 32, 27, TileType.WALL);
 
-  // Town entrance (south)
+  // Town entrances
   map[60][49] = TileType.STONE_FLOOR;
   map[60][50] = TileType.STONE_FLOOR;
-
-  // Town entrance (north)
   map[34][49] = TileType.STONE_FLOOR;
   map[34][50] = TileType.STONE_FLOOR;
-
-  // Town entrance (east)
   map[47][65] = TileType.STONE_FLOOR;
   map[48][65] = TileType.STONE_FLOOR;
-
-  // Town entrance (west)
   map[47][34] = TileType.STONE_FLOOR;
   map[48][34] = TileType.STONE_FLOOR;
 
   // Town buildings
-  // Merchant shop
   fillRect(map, 37, 37, 8, 6, TileType.WOOD_FLOOR);
   drawRect(map, 37, 37, 8, 6, TileType.WALL);
   map[42][41] = TileType.WOOD_FLOOR; // door
 
-  // Healer temple
   fillRect(map, 55, 37, 8, 6, TileType.STONE_FLOOR);
   drawRect(map, 55, 37, 8, 6, TileType.WALL);
   map[55][59] = TileType.STONE_FLOOR; // door
 
-  // Bank
   fillRect(map, 37, 50, 6, 6, TileType.WOOD_FLOOR);
   drawRect(map, 37, 50, 6, 6, TileType.WALL);
   map[53][40] = TileType.WOOD_FLOOR; // door
 
-  // Town decorations
   addRandomBushes(map, 36, 36, 28, 23, 0.02);
 
   // ============ PATHS ============
-  // North path to forest
   createPath(map, 50, 34, 50, 5, 2);
-
-  // South path to swamp
   createPath(map, 50, 60, 50, 95, 2);
-
-  // East path to cave
   createPath(map, 65, 47, 95, 47, 2);
-
-  // West path to desert
   createPath(map, 34, 47, 5, 47, 2);
 
   // ============ NORTH FOREST (easy monsters) ============
   fillRect(map, 5, 2, 90, 28, TileType.DARK_GRASS);
-  addRandomTrees(map, 5, 2, 90, 28, 0.25);
-  addRandomBushes(map, 5, 2, 90, 28, 0.08);
-  // Clear path area
+  addRandomTrees(map, 5, 2, 90, 28, 0.2);
+  addRandomBushes(map, 5, 2, 90, 28, 0.06);
   fillRect(map, 48, 2, 4, 32, TileType.DARK_GRASS);
-  // Forest clearing
   fillRect(map, 40, 10, 20, 10, TileType.GRASS);
-  addRandomBushes(map, 40, 10, 20, 10, 0.05);
+  addRandomBushes(map, 40, 10, 20, 10, 0.04);
 
   // ============ SOUTH SWAMP (medium monsters) ============
   fillRect(map, 5, 65, 90, 33, TileType.SWAMP);
-  // Water pools in swamp
   fillRect(map, 15, 72, 8, 6, TileType.WATER);
   fillRect(map, 55, 80, 10, 8, TileType.WATER);
   fillRect(map, 75, 68, 6, 5, TileType.WATER);
-  // Bridge
   fillRect(map, 48, 60, 4, 40, TileType.BRIDGE);
-  // Swamp trees
-  addRandomTrees(map, 5, 65, 90, 33, 0.12);
+  addRandomTrees(map, 5, 65, 90, 33, 0.1);
 
   // ============ EAST CAVE/MOUNTAINS (hard monsters) ============
   fillRect(map, 70, 5, 28, 58, TileType.STONE);
-  addRandomRocks(map, 70, 5, 28, 58, 0.15);
+  addRandomRocks(map, 70, 5, 28, 58, 0.12);
   // Cave entrance area
   fillRect(map, 78, 20, 12, 15, TileType.STONE_FLOOR);
   drawRect(map, 78, 20, 12, 15, TileType.WALL);
-  map[26][78] = TileType.STONE_FLOOR; // entrance
+  map[26][78] = TileType.STONE_FLOOR;
 
   // Deep cave (dungeon)
   fillRect(map, 82, 22, 8, 10, TileType.STONE_FLOOR);
   fillRect(map, 70, 40, 15, 12, TileType.STONE_FLOOR);
   drawRect(map, 70, 40, 15, 12, TileType.WALL);
-  map[45][70] = TileType.STONE_FLOOR; // entrance
+  map[45][70] = TileType.STONE_FLOOR;
 
   // ============ WEST DESERT (medium-hard) ============
   fillRect(map, 2, 5, 30, 58, TileType.SAND);
-  addRandomRocks(map, 2, 5, 30, 58, 0.05);
-  // Oasis
+  addRandomRocks(map, 2, 5, 30, 58, 0.04);
   fillRect(map, 12, 25, 6, 5, TileType.WATER);
-  addRandomTrees(map, 10, 23, 10, 9, 0.15);
+  addRandomTrees(map, 10, 23, 10, 9, 0.12);
 
   // ============ WATER BORDERS ============
-  // River running north-south
   for (let y = 2; y < 65; y++) {
     const x = 68;
     if (map[y][x] === TileType.GRASS || map[y][x] === TileType.DARK_GRASS || map[y][x] === TileType.DIRT) {
@@ -221,26 +185,20 @@ export function generateGameMap(): GameMap {
       }
     }
   }
-  // Bridge over river
   fillRect(map, 42, 68, 4, 3, TileType.BRIDGE);
 
   // ============ CORNER AREAS ============
-  // NW - peaceful meadow
   fillRect(map, 2, 2, 10, 10, TileType.GRASS);
-  addRandomBushes(map, 2, 2, 10, 10, 0.1);
+  addRandomBushes(map, 2, 2, 10, 10, 0.08);
 
-  // NE - mountain peak
   fillRect(map, 88, 2, 10, 10, TileType.SNOW);
-  addRandomRocks(map, 88, 2, 10, 10, 0.1);
+  addRandomRocks(map, 88, 2, 10, 10, 0.08);
 
-  // SW - lava fields
   fillRect(map, 2, 88, 10, 10, TileType.LAVA);
-  // Small safe path through
   fillRect(map, 5, 88, 3, 10, TileType.STONE);
 
-  // SE - dark forest
   fillRect(map, 88, 88, 10, 10, TileType.DARK_GRASS);
-  addRandomTrees(map, 88, 88, 10, 10, 0.35);
+  addRandomTrees(map, 88, 88, 10, 10, 0.3);
 
   // ============ NPC DEFINITIONS ============
   const npcs: NPCDefinition[] = [
@@ -249,7 +207,7 @@ export function generateGameMap(): GameMap {
       name: 'Merchant Aldric',
       position: { x: 41, y: 40 },
       type: 'merchant',
-      greeting: 'Welcome to my shop, adventurer! I have the finest goods in the land.',
+      greeting: 'Welcome to my shop! I have weapons, armor, and potions. You can also sell your loot here!',
       color: '#e67e22',
       icon: '🧑‍🍳',
       shopItems: [
@@ -262,14 +220,26 @@ export function generateGameMap(): GameMap {
         'wooden_sword',
         'short_sword',
         'long_sword',
+        'battle_axe',
+        'magic_staff',
+        'arcane_staff',
+        'crossbow',
         'wooden_shield',
+        'iron_shield',
         'leather_armor',
         'chain_mail',
+        'plate_armor',
+        'mage_robe',
+        'mystic_robe',
         'leather_helmet',
+        'iron_helmet',
         'leather_legs',
+        'chain_legs',
         'leather_boots',
-        'magic_staff',
-        'crossbow',
+        'steel_boots',
+        'enchanted_boots',
+        'ring_of_life',
+        'ring_of_mana',
       ],
     },
     {
@@ -286,7 +256,7 @@ export function generateGameMap(): GameMap {
       name: 'Banker Grimm',
       position: { x: 40, y: 53 },
       type: 'banker',
-      greeting: 'Welcome to the Bank of Tibia. Your gold is safe here.',
+      greeting: 'Welcome to the Bank of Tibia Lands!',
       color: '#2ecc71',
       icon: '🧑‍💼',
     },
@@ -295,7 +265,7 @@ export function generateGameMap(): GameMap {
       name: 'Old Sage Marcus',
       position: { x: 50, y: 45 },
       type: 'quest',
-      greeting: 'Ah, an adventurer! These lands are plagued by monsters. Will you help us?',
+      greeting: 'Ah, an adventurer! These lands are full of dangerous creatures. Will you help us?',
       color: '#9b59b6',
       icon: '🧙',
     },
@@ -303,73 +273,91 @@ export function generateGameMap(): GameMap {
 
   // ============ MONSTER ZONES ============
   const monsterZones: MonsterZone[] = [
-    // Forest - easy
+    // Forest - easy (rats, bats, snakes)
     {
       id: 'forest_easy',
       area: { x: 8, y: 4, width: 80, height: 24 },
-      monsterIds: ['rat', 'snake'],
-      maxMonsters: 15,
-      spawnRate: 5000,
+      monsterIds: ['rat', 'bat', 'snake'],
+      maxMonsters: 20,
+      spawnRate: 4000,
     },
+    // Forest clearing - medium (spiders, goblins)
     {
       id: 'forest_medium',
       area: { x: 40, y: 10, width: 20, height: 10 },
-      monsterIds: ['spider', 'wolf'],
-      maxMonsters: 8,
-      spawnRate: 8000,
-    },
-    // Swamp - medium
-    {
-      id: 'swamp',
-      area: { x: 5, y: 65, width: 90, height: 33 },
-      monsterIds: ['snake', 'spider', 'wolf'],
-      maxMonsters: 20,
+      monsterIds: ['spider', 'goblin'],
+      maxMonsters: 12,
       spawnRate: 6000,
     },
-    // Desert - medium-hard
+    // Swamp - medium (snakes, spiders, wolves, scorpions)
+    {
+      id: 'swamp',
+      area: { x: 5, y: 65, width: 60, height: 33 },
+      monsterIds: ['snake', 'spider', 'wolf', 'scorpion'],
+      maxMonsters: 25,
+      spawnRate: 5000,
+    },
+    // Desert - medium-hard (wolves, orcs, trolls)
     {
       id: 'desert',
       area: { x: 2, y: 5, width: 30, height: 58 },
-      monsterIds: ['wolf', 'orc'],
-      maxMonsters: 15,
-      spawnRate: 7000,
+      monsterIds: ['wolf', 'orc', 'goblin', 'scorpion'],
+      maxMonsters: 20,
+      spawnRate: 6000,
     },
-    // Cave - hard
+    // Cave - hard (skeletons, wraiths, dark mages)
     {
       id: 'cave',
       area: { x: 78, y: 20, width: 12, height: 15 },
-      monsterIds: ['skeleton', 'orc'],
-      maxMonsters: 10,
-      spawnRate: 8000,
+      monsterIds: ['skeleton', 'wraith', 'dark_mage'],
+      maxMonsters: 12,
+      spawnRate: 7000,
     },
+    // Deep cave - very hard (dark mages, fire elementals, demons)
     {
       id: 'deep_cave',
       area: { x: 70, y: 40, width: 15, height: 12 },
-      monsterIds: ['skeleton', 'demon'],
-      maxMonsters: 8,
-      spawnRate: 12000,
+      monsterIds: ['dark_mage', 'fire_elemental', 'demon'],
+      maxMonsters: 10,
+      spawnRate: 10000,
     },
-    // Lava fields - boss area
+    // Snow peak - hard (wraiths, trolls)
+    {
+      id: 'snow_peak',
+      area: { x: 88, y: 2, width: 10, height: 10 },
+      monsterIds: ['wraith', 'troll'],
+      maxMonsters: 8,
+      spawnRate: 8000,
+    },
+    // Lava fields - boss area (fire elementals, demons, demon lord)
     {
       id: 'lava_fields',
       area: { x: 2, y: 88, width: 10, height: 10 },
-      monsterIds: ['demon'],
-      maxMonsters: 3,
-      spawnRate: 30000,
+      monsterIds: ['fire_elemental', 'demon', 'demon_lord'],
+      maxMonsters: 6,
+      spawnRate: 20000,
     },
-    // Dark forest - dragon
+    // Dark forest - dragon area (trolls, dragons, ancient dragon)
     {
       id: 'dark_forest',
       area: { x: 88, y: 88, width: 10, height: 10 },
-      monsterIds: ['dragon'],
-      maxMonsters: 1,
-      spawnRate: 60000,
+      monsterIds: ['troll', 'dragon', 'ancient_dragon'],
+      maxMonsters: 5,
+      spawnRate: 30000,
+    },
+    // Swamp deep - harder monsters
+    {
+      id: 'swamp_deep',
+      area: { x: 65, y: 70, width: 30, height: 28 },
+      monsterIds: ['scorpion', 'orc', 'troll'],
+      maxMonsters: 15,
+      spawnRate: 7000,
     },
   ];
 
   return {
     tiles: map,
-    spawnPoint: { x: 50, y: 47 }, // Town center
+    spawnPoint: { x: 50, y: 47 },
     npcs,
     monsterZones,
     name: 'Tibia Lands',

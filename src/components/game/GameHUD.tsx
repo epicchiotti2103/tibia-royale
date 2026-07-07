@@ -1,12 +1,36 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGameStore } from '@/store/game-store';
 import { ITEMS } from '@/lib/game/items';
-import { EquipSlot, ItemType } from '@/lib/game/types';
+import { EquipSlot } from '@/lib/game/types';
 
 export default function GameHUD() {
   const player = useGameStore((s) => s.player);
+
+  const [time, setTime] = useState('');
+
+  useEffect(() => {
+    const updateTime = () => {
+      const gameMinutes = Date.now() / 100;
+      const totalGameHours = (gameMinutes / 60) % 24;
+      const hours = Math.floor(totalGameHours);
+      const minutes = Math.floor((totalGameHours - hours) * 60);
+
+      let period: string;
+      let icon: string;
+      if (hours >= 6 && hours < 12) { period = 'Morning'; icon = '🌅'; }
+      else if (hours >= 12 && hours < 18) { period = 'Afternoon'; icon = '☀️'; }
+      else if (hours >= 18 && hours < 21) { period = 'Evening'; icon = '🌇'; }
+      else { period = 'Night'; icon = '🌙'; }
+
+      setTime(`${icon} ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`);
+    };
+
+    updateTime();
+    const interval = setInterval(updateTime, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   if (!player) return null;
 
@@ -38,16 +62,17 @@ export default function GameHUD() {
     <div className="absolute top-0 left-0 right-0 pointer-events-none z-10">
       {/* Top bar - Character Info */}
       <div className="flex items-start justify-between p-2 gap-2">
-        {/* Character panel */}
+        {/* Character panel - includes time */}
         <div className="bg-black/80 border border-amber-700/50 rounded-lg p-2 pointer-events-auto min-w-[200px]">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-8 h-8 rounded bg-amber-700 flex items-center justify-center text-white text-sm font-bold">
               {player.vocation[0]}
             </div>
-            <div>
+            <div className="flex-1">
               <div className="text-amber-400 font-bold text-sm leading-tight">{player.name}</div>
               <div className="text-amber-200/60 text-xs">
-                {player.vocation} • Level {stats.level}
+                {player.vocation} • Lv.{stats.level}
+                {time && <span className="ml-2 text-gray-500">{time}</span>}
               </div>
             </div>
           </div>
@@ -108,9 +133,9 @@ export default function GameHUD() {
           </div>
         </div>
 
-        {/* Quick Stats */}
+        {/* Quick Stats - compact */}
         <div className="bg-black/80 border border-amber-700/50 rounded-lg p-2 pointer-events-auto text-xs">
-          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-gray-300">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-gray-300">
             <div>⚔️ Atk: <span className="text-orange-400 font-bold">{totalAttack}</span></div>
             <div>🛡️ Def: <span className="text-gray-200 font-bold">{totalDefense}</span></div>
             <div>🔮 Mag: <span className="text-purple-400 font-bold">{totalMagicAtk}</span></div>

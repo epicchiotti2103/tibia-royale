@@ -1137,11 +1137,10 @@ export default function GameCanvas() {
         useGameStore.getState().interactNPC();
       }
 
-      // F1-F4 = cast skills
-      if (key === 'f1') { e.preventDefault(); useGameStore.getState().castSkill(0); }
-      if (key === 'f2') { e.preventDefault(); useGameStore.getState().castSkill(1); }
-      if (key === 'f3') { e.preventDefault(); useGameStore.getState().castSkill(2); }
-      if (key === 'f4') { e.preventDefault(); useGameStore.getState().castSkill(3); }
+      // I, O, P = cast skills (Mac-friendly keys)
+      if (key === 'i') { e.preventDefault(); useGameStore.getState().castSkill(0); }
+      if (key === 'o') { e.preventDefault(); useGameStore.getState().castSkill(1); }
+      if (key === 'p') { e.preventDefault(); useGameStore.getState().castSkill(2); }
 
       // Q1/Q2 = quick potions
       if (key === 'q') {

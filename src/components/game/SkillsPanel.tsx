@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useGameStore } from '@/store/game-store';
-import { getSkillsForVocation } from '@/lib/game/skills';
+import { getSkillsForVocation, SKILL_HOTKEYS } from '@/lib/game/skills';
 import type { SkillDef } from '@/lib/game/skills';
 
 export { getSkillsForVocation, getSkill } from '@/lib/game/skills';
@@ -35,7 +35,7 @@ export default function SkillsPanel() {
           <button
             onClick={() => useGameStore.getState().attackMonster()}
             className="w-12 h-12 rounded-lg border-2 border-amber-600 bg-gray-900/90 hover:bg-gray-800 hover:border-amber-400 cursor-pointer hover:scale-110 active:scale-95 transition-all flex flex-col items-center justify-center"
-            title="Basic Attack (Space / Click on monster)"
+            title="Basic Attack (Space)"
           >
             <span className="text-xl leading-none">⚔️</span>
             <span className="text-[8px] text-amber-400 leading-none mt-0.5 font-bold">SPC</span>
@@ -43,8 +43,8 @@ export default function SkillsPanel() {
           <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50">
             <div className="bg-gray-900 border border-gray-600 rounded-lg p-2 w-40 shadow-xl">
               <div className="font-bold text-sm text-amber-400">⚔️ Basic Attack</div>
-              <div className="text-[10px] text-gray-400 mt-1">Attack with your sword.</div>
-              <div className="text-[10px] text-gray-500 mt-1">Press <span className="text-amber-300">Space</span> or click a monster</div>
+              <div className="text-[10px] text-gray-400 mt-1">Attack with your weapon.</div>
+              <div className="text-[10px] text-gray-500 mt-1">Press <span className="text-amber-300">Space</span></div>
             </div>
           </div>
         </div>
@@ -52,8 +52,9 @@ export default function SkillsPanel() {
         {/* Separator */}
         <div className="w-px h-8 bg-amber-700/30 mx-1 self-center" />
 
-        {/* Skill slots */}
+        {/* Skill slots - I, O, P */}
         {skills.map((skill: SkillDef, index: number) => {
+          const hotkey = SKILL_HOTKEYS[index] || '?';
           const lastUsed = skillCooldowns[skill.id] || 0;
           const isOnCooldown = now - lastUsed < skill.cooldown;
           const cooldownRemaining = isOnCooldown ? Math.ceil((skill.cooldown - (now - lastUsed)) / 1000) : 0;
@@ -73,7 +74,7 @@ export default function SkillsPanel() {
                     'border-blue-900 bg-gray-900/90 cursor-pointer hover:scale-110 active:scale-95'}`}
               >
                 <span className="text-xl leading-none">{skill.icon}</span>
-                <span className="text-[8px] text-amber-300 leading-none mt-0.5 font-bold">F{index + 1}</span>
+                <span className="text-[8px] text-amber-300 leading-none mt-0.5 font-bold">{hotkey}</span>
 
                 {/* Cooldown overlay with sweep */}
                 {isOnCooldown && (
@@ -125,7 +126,7 @@ export default function SkillsPanel() {
                   {skill.healAmount && (
                     <div className="text-[10px] text-green-400 mt-1">💚 ~{skill.healAmount} healing</div>
                   )}
-                  <div className="text-[10px] text-amber-300 mt-1">Press <span className="text-amber-100 font-bold">F{index + 1}</span> or click</div>
+                  <div className="text-[10px] text-amber-300 mt-1">Press <span className="text-amber-100 font-bold">{hotkey}</span> or click</div>
                   {isLocked && (
                     <div className="text-[10px] text-red-400 mt-1">🔒 Requires Level {skill.levelReq}</div>
                   )}
@@ -168,11 +169,9 @@ function QuickPotionSlot({ type }: { type: 'hp' | 'mp' }) {
     .reduce((sum, i) => sum + i.quantity, 0);
 
   const handleUse = () => {
-    // Find best available potion
     const potions = player.inventory.filter(i =>
       isHP ? i.itemId.startsWith('health_potion') : i.itemId.startsWith('mana_potion')
     ).sort((a, b) => {
-      // Prefer larger potions
       const order = isHP
         ? ['health_potion_large', 'health_potion_medium', 'health_potion_small']
         : ['mana_potion_large', 'mana_potion_medium', 'mana_potion_small'];
@@ -200,7 +199,7 @@ function QuickPotionSlot({ type }: { type: 'hp' | 'mp' }) {
             'border-gray-600 bg-gray-900/90 hover:bg-gray-800 hover:border-gray-400 cursor-pointer hover:scale-110 active:scale-95'}`}
       >
         <span className="text-xl leading-none">{isHP ? '❤️' : '💧'}</span>
-        <span className="text-[8px] text-gray-300 leading-none mt-0.5 font-bold">{count > 0 ? `Q${isHP ? '1' : '2'}` : '--'}</span>
+        <span className="text-[8px] text-gray-300 leading-none mt-0.5 font-bold">Q{isHP ? '1' : '2'}</span>
         {count > 0 && (
           <div className="absolute top-0.5 right-1 text-[7px] text-white font-bold bg-black/50 rounded px-0.5">
             {count}
@@ -216,7 +215,6 @@ function QuickPotionSlot({ type }: { type: 'hp' | 'mp' }) {
             {count > 0 ? `${count} potion${count > 1 ? 's' : ''} available` : 'No potions!'}
           </div>
           <div className="text-[10px] text-amber-300 mt-1">Press <span className="text-amber-100 font-bold">Q{isHP ? '1' : '2'}</span> or click</div>
-          <div className="text-[10px] text-gray-500 mt-1">Uses best available potion</div>
         </div>
       </div>
     </div>

@@ -95,6 +95,7 @@ interface GameState {
   activeNPC: NPCDefinition | null;
   setActiveNPC: (npc: NPCDefinition | null) => void;
   buyItem: (itemId: string) => void;
+  sellItem: (invItemId: string) => void;
 
   // Player death / respawn
   playerDeath: () => void;
@@ -155,7 +156,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     get().addChatMessage({
       type: 'system',
       sender: 'System',
-      content: `Welcome to Tibia Lands, ${name} the ${vocation}! WASD: Move | Space/Click: Attack | F1-F4: Skills | 1-9: Items | E: Interact`,
+      content: `Welcome to Tibia Lands, ${name} the ${vocation}! WASD: Move | Space: Attack | I/O/P: Skills | Q1/Q2: Potions | 1-9: Items | E: Interact`,
       color: '#f1c40f',
     });
   },
@@ -967,6 +968,37 @@ export const useGameStore = create<GameState>((set, get) => ({
     addChatMessage({ type: 'system', sender: 'Merchant', content: `Bought ${itemDef.name} for ${itemDef.buyPrice} gold.`, color: '#2ecc71' });
   },
 
+  sellItem: (invItemId) => {
+    const { player, addChatMessage } = get();
+    if (!player) return;
+
+    const invItem = player.inventory.find(i => i.id === invItemId);
+    if (!invItem) return;
+
+    const itemDef = ITEMS[invItem.itemId];
+    if (!itemDef || itemDef.sellPrice <= 0) {
+      addChatMessage({ type: 'system', sender: 'Merchant', content: 'This item cannot be sold.', color: '#e74c3c' });
+      return;
+    }
+
+    const sellPrice = itemDef.sellPrice * invItem.quantity;
+
+    set(state => {
+      if (!state.player) return state;
+      const newInventory = state.player.inventory.filter(i => i.id !== invItemId);
+      return {
+        player: {
+          ...state.player,
+          gold: state.player.gold + sellPrice,
+          inventory: newInventory,
+        },
+      };
+    });
+
+    const qtyStr = invItem.quantity > 1 ? ` x${invItem.quantity}` : '';
+    addChatMessage({ type: 'system', sender: 'Merchant', content: `Sold ${itemDef.name}${qtyStr} for ${sellPrice} gold.`, color: '#f1c40f' });
+  },
+
   playerDeath: () => {
     const { player, addChatMessage } = get();
     if (!player) return;
@@ -1020,7 +1052,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (!state.player) return state;
       const { mana, maxMana } = state.player.stats;
       if (mana >= maxMana) return state;
-      const regenAmount = Math.min(1 + state.player.stats.level * 0.2, maxMana - mana);
+      // Spellcasters regen much faster
+      const isCaster = state.player.vocation === 'Sorcerer' || state.player.vocation === 'Druid';
+      const baseRegen = isCaster ? 3 : 1;
+      const regenPerLevel = isCaster ? 0.8 : 0.2;
+      const regenAmount = Math.min(baseRegen + state.player.stats.level * regenPerLevel, maxMana - mana);
       const regen = regenAmount * (deltaTime / 1000);
       return {
         player: {

@@ -191,47 +191,10 @@ export default function HomePage() {
       {/* Death Screen Overlay */}
       {screen === 'dead' && <DeathScreen />}
 
-      {/* Time of day indicator */}
-      <TimeIndicator />
-
       {/* Controls hint */}
-      <div className="absolute bottom-2 right-2 z-10 bg-black/60 rounded px-2 py-1 text-[10px] text-gray-500">
-        WASD: Move | Space(hold): Attack | F1-F4: Skills | Q: Potion | 1-9: Items
+      <div className="absolute bottom-14 right-2 z-10 bg-black/60 rounded px-2 py-1 text-[10px] text-gray-500">
+        WASD: Move | SPC: Attack | I/O/P: Skills | Q: Potion | 1-9: Items | E: NPC
       </div>
-    </div>
-  );
-}
-
-function TimeIndicator() {
-  const [time, setTime] = React.useState('');
-
-  React.useEffect(() => {
-    const updateTime = () => {
-      const gameMinutes = Date.now() / 100; // 1 real second = ~10 game minutes
-      const totalGameHours = (gameMinutes / 60) % 24;
-      const hours = Math.floor(totalGameHours);
-      const minutes = Math.floor((totalGameHours - hours) * 60);
-
-      let period: string;
-      let icon: string;
-      if (hours >= 6 && hours < 12) { period = 'Morning'; icon = '🌅'; }
-      else if (hours >= 12 && hours < 18) { period = 'Afternoon'; icon = '☀️'; }
-      else if (hours >= 18 && hours < 21) { period = 'Evening'; icon = '🌇'; }
-      else { period = 'Night'; icon = '🌙'; }
-
-      setTime(`${icon} ${period} ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`);
-    };
-
-    updateTime();
-    const interval = setInterval(updateTime, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  if (!time) return null;
-
-  return (
-    <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-black/60 border border-amber-700/30 rounded-lg px-3 py-1 text-amber-200/80 text-xs font-mono">
-      {time}
     </div>
   );
 }

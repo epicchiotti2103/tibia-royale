@@ -139,4 +139,32 @@ Stage Summary:
 - 6 novos recursos visuais/de jogabilidade implementados
 - Screen shake, level up celebration, morte animada, retícula de alvo, poções rápidas, auto-attack
 - Zero erros de console verificados
-- Jogo significativamente mais polido e responsivo
+- Jogo significativamente mais polido e responsivo---
+Task ID: 1
+Agent: Main Agent
+Task: Add more monsters, shop sell system, fix HUD, change hotkeys, balance Sorcerer vs Knight
+
+Work Log:
+- Added 8 new monster types: Bat, Goblin, Scorpion, Troll, Wraith, Dark Mage, Fire Elemental, Demon Lord, Ancient Dragon
+- Expanded monster zones from 8 to 10, with more monsters per zone
+- Added sellItem() function to game store with gold calculation
+- Rewrote NPCDialog with Buy/Sell tabs, category filters, and "Sell All" button
+- Added 4 new items: Arcane Staff, Inferno Staff, Elven Bow, Mystic Robe, Enchanted Boots
+- Expanded merchant shop to 29 items including all new gear
+- Moved time indicator from overlay into GameHUD character panel (fixes overlap with attack stats)
+- Changed skill hotkeys from F1-F4 to I, O, P (Mac keyboard friendly)
+- Updated all tooltips and controls hints
+- Nerfed Knight: HP 150→120, Atk 12→8, Def 10→8, HP/level 15→10, Atk/level 3→2
+- Buffed Sorcerer: HP 80→100, Mana 150→200, MagAtk 15→25, MagAtk/level 4→6, MagDef 8→12
+- Buffed Sorcerer skills: Fireball 40→70 dmg, 2s→1s CD; Lightning 80→140, 4s→2s; Energy Beam 150→280, 8s→3.5s
+- Fireball now available at level 1 (was 3), Lightning at 8 (was 12), Energy Beam at 15 (was 20)
+- Boosted mana regen: casters get 3+level*0.8/sec vs melee 1+level*0.2/sec
+- Updated quest NPC dialog with all new monster locations
+- Verified with Agent Browser + VLM: all UI elements render correctly, no console errors
+
+Stage Summary:
+- Game now has 17 monster types across 10 zones covering easy to legendary difficulty
+- Complete buy/sell shop system with category filters
+- I/O/P hotkeys work on Mac notebooks
+- Sorcerer is now significantly stronger than Knight (high magic damage, fast spell casting)
+- Time display no longer overlaps with attack stats
