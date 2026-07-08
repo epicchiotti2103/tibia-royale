@@ -147,6 +147,13 @@ export default function GameHUD() {
         <div className="bg-black/80 border border-amber-700/50 rounded-lg px-3 py-2 pointer-events-auto">
           <div className="text-yellow-400 font-bold text-sm">🪙 {player.gold}</div>
         </div>
+        {/* Skill Points display */}
+        {player.stats.skillPoints > 0 && (
+          <div className="bg-black/80 border border-yellow-500/50 rounded-lg px-3 py-2 pointer-events-auto animate-pulse">
+            <div className="text-yellow-300 font-bold text-sm">⭐ {player.stats.skillPoints} SP</div>
+            <div className="text-[8px] text-yellow-500">Skill Points!</div>
+          </div>
+        )}
       </div>
     </div>
   );

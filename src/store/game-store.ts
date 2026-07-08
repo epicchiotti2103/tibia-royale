@@ -78,6 +78,8 @@ interface GameState {
   castSkill: (skillIndex: number) => void;
   skillCooldowns: Record<string, number>;
   buffEndTime: number;
+  skillUpgrades: Record<string, number>;
+  upgradeSkill: (skillId: string) => void;
 
   // Visual feedback
   screenShakeTime: number;
@@ -119,6 +121,14 @@ function isPositionBlocked(x: number, y: number, map: GameMap): boolean {
   const tile = map.tiles[y][x];
   return tile === 4 ? false : // SAND is walkable
     (tile === 2 || tile === 7 || tile === 6 || tile === 13 || tile === 14); // WATER, WALL, LAVA, TREE, ROCK
+}
+
+// Town bounds (safe zone)
+const TOWN_BOUNDS = { x: 35, y: 35, w: 30, h: 25 };
+
+function isInTown(x: number, y: number): boolean {
+  return x >= TOWN_BOUNDS.x && x < TOWN_BOUNDS.x + TOWN_BOUNDS.w &&
+         y >= TOWN_BOUNDS.y && y < TOWN_BOUNDS.y + TOWN_BOUNDS.h;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -243,6 +253,24 @@ export const useGameStore = create<GameState>((set, get) => ({
 
       // Movement
       if (monster.targetId) {
+        // Monsters cannot enter or stay in town
+        if (isInTown(monster.position.x, monster.position.y)) {
+          monster.targetId = undefined;
+          // Move towards spawn position
+          const sdx = monster.spawnPosition.x - monster.position.x;
+          const sdy = monster.spawnPosition.y - monster.position.y;
+          if (Math.abs(sdx) > 0 || Math.abs(sdy) > 0) {
+            const retX = sdx > 0 ? 1 : sdx < 0 ? -1 : 0;
+            const retY = sdy > 0 ? 1 : sdy < 0 ? -1 : 0;
+            const rX = monster.position.x + retX;
+            const rY = monster.position.y + retY;
+            if (!isPositionBlocked(rX, rY, gameMap)) {
+              monster.position = { x: rX, y: rY };
+            }
+          }
+          return { ...monster };
+        }
+
         if (dist > def.attackRange) {
           // Move towards player
           const moveX = dx > 0 ? 1 : dx < 0 ? -1 : 0;
@@ -253,11 +281,11 @@ export const useGameStore = create<GameState>((set, get) => ({
           let newY = monster.position.y + moveY;
 
           // Simple collision avoidance
-          if (!isPositionBlocked(newX, newY, gameMap) && !isMonsterAt(newX, newY, monsters, monster.id)) {
+          if (!isPositionBlocked(newX, newY, gameMap) && !isMonsterAt(newX, newY, monsters, monster.id) && !isInTown(newX, newY)) {
             monster.position = { x: newX, y: newY };
-          } else if (moveX !== 0 && !isPositionBlocked(newX, monster.position.y, gameMap)) {
+          } else if (moveX !== 0 && !isPositionBlocked(newX, monster.position.y, gameMap) && !isInTown(newX, monster.position.y)) {
             monster.position = { x: newX, y: monster.position.y };
-          } else if (moveY !== 0 && !isPositionBlocked(monster.position.x, newY, gameMap)) {
+          } else if (moveY !== 0 && !isPositionBlocked(monster.position.x, newY, gameMap) && !isInTown(monster.position.x, newY)) {
             monster.position = { x: monster.position.x, y: newY };
           }
         } else if (dist <= def.attackRange && now - monster.lastAttackTime > def.attackSpeed) {
@@ -308,7 +336,8 @@ export const useGameStore = create<GameState>((set, get) => ({
           const newY = monster.position.y + dir.y;
           if (!isPositionBlocked(newX, newY, gameMap) &&
               Math.abs(newX - monster.spawnPosition.x) < 8 &&
-              Math.abs(newY - monster.spawnPosition.y) < 8) {
+              Math.abs(newY - monster.spawnPosition.y) < 8 &&
+              !isInTown(newX, newY)) {
             monster.position = { x: newX, y: newY };
           }
         }
@@ -336,7 +365,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   movePlayer: (direction) => {
-    const { player, gameMap, monsters } = get();
+    const { player, gameMap, monsters, addChatMessage } = get();
     if (!player) return;
 
     const dx = direction === Direction.EAST ? 1 : direction === Direction.WEST ? -1 : 0;
@@ -352,6 +381,17 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     // Monster collision (don't walk on monsters)
     if (isMonsterAt(newX, newY, monsters)) return;
+
+    // Can't enter town while in combat
+    if (isInTown(newX, newY)) {
+      const inCombat = monsters.some(m =>
+        !m.isDead && m.targetId === player.id
+      );
+      if (inCombat) {
+        addChatMessage({ type: 'system', sender: 'System', content: "⚠️ You can't enter town while in combat!", color: '#e74c3c' });
+        return;
+      }
+    }
 
     set(state => ({
       player: state.player ? {
@@ -484,7 +524,7 @@ export const useGameStore = create<GameState>((set, get) => ({
             addChatMessage({
               type: 'system',
               sender: 'Level Up!',
-              content: `🎉 Congratulations! You are now level ${newLevel}!`,
+              content: `🎉 Level ${newLevel}! +2 Skill Points! (Total: ${(newStats.skillPoints || 0) + 2})`,
               color: '#f1c40f',
             });
             return {
@@ -495,6 +535,7 @@ export const useGameStore = create<GameState>((set, get) => ({
                   experience: newExp - state.player.stats.experienceToNext,
                   health: newStats.maxHealth,
                   mana: newStats.maxMana,
+                  skillPoints: (newStats.skillPoints || 0) + 2,
                 },
               },
               levelUpTime: Date.now(),
@@ -577,6 +618,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   spellEffects: [],
   skillCooldowns: {},
   buffEndTime: 0,
+  skillUpgrades: {},
   screenShakeTime: 0,
   levelUpTime: 0,
   lastAutoAttackTime: 0,
@@ -602,20 +644,28 @@ export const useGameStore = create<GameState>((set, get) => ({
     const skill = skills[skillIndex];
     if (!skill) return;
 
+    const { skillUpgrades } = get();
+    const upgradeLevel = skillUpgrades[skill.id] || 0;
+    const upgradeDmgMult = 1 + upgradeLevel * 0.20; // +20% per level
+    const upgradeManaMult = Math.max(0.4, 1 - upgradeLevel * 0.06); // -6% per level, min 40%
+    const upgradeCdMult = Math.max(0.4, 1 - upgradeLevel * 0.05); // -5% per level, min 40%
+    const effectiveManaCost = Math.floor(skill.manaCost * upgradeManaMult);
+    const effectiveCooldown = Math.floor(skill.cooldown * upgradeCdMult);
+
     if (player.stats.level < skill.levelReq) {
       addChatMessage({ type: 'system', sender: 'Skills', content: `Need level ${skill.levelReq} for ${skill.name}!`, color: '#e74c3c' });
       return;
     }
 
-    if (player.stats.mana < skill.manaCost) {
-      addChatMessage({ type: 'system', sender: 'Skills', content: `Not enough mana! Need ${skill.manaCost} MP.`, color: '#3498db' });
+    if (player.stats.mana < effectiveManaCost) {
+      addChatMessage({ type: 'system', sender: 'Skills', content: `Not enough mana! Need ${effectiveManaCost} MP.`, color: '#3498db' });
       return;
     }
 
     const now = Date.now();
     const lastUsed = skillCooldowns[skill.id] || 0;
-    if (now - lastUsed < skill.cooldown) {
-      const remaining = Math.ceil((skill.cooldown - (now - lastUsed)) / 1000);
+    if (now - lastUsed < effectiveCooldown) {
+      const remaining = Math.ceil((effectiveCooldown - (now - lastUsed)) / 1000);
       addChatMessage({ type: 'system', sender: 'Skills', content: `${skill.name} on cooldown! ${remaining}s.`, color: '#e67e22' });
       return;
     }
@@ -624,7 +674,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     set(state => {
       if (!state.player) return state;
       return {
-        player: { ...state.player, stats: { ...state.player.stats, mana: Math.max(0, state.player.stats.mana - skill.manaCost) } },
+        player: { ...state.player, stats: { ...state.player.stats, mana: Math.max(0, state.player.stats.mana - effectiveManaCost) } },
         skillCooldowns: { ...state.skillCooldowns, [skill.id]: now },
       };
     });
@@ -634,7 +684,8 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     if (skill.type === 'heal' && skill.healAmount) {
       // Heal spells
-      const newHealth = Math.min(player.stats.maxHealth, player.stats.health + skill.healAmount);
+      const effectiveHeal = Math.floor(skill.healAmount * upgradeDmgMult);
+      const newHealth = Math.min(player.stats.maxHealth, player.stats.health + effectiveHeal);
       const healed = newHealth - player.stats.health;
       set(state => {
         if (!state.player) return state;
@@ -700,7 +751,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const buffBonus = now < (get().buffEndTime) ? 1.15 : 1.0;
     const magicPower = player.stats.magicAttack + (skill.damage || 0) * 0.3;
     const variance = 0.8 + Math.random() * 0.4;
-    let dmg = Math.floor((skill.damage || 30) + magicPower * 0.5 * variance * buffBonus);
+    let dmg = Math.floor(((skill.damage || 30) + magicPower * 0.5) * variance * buffBonus * upgradeDmgMult);
     const def = MONSTERS[targetMonster.definitionId];
     if (def) dmg = Math.max(1, dmg - Math.floor(def.defense * 0.3));
 
@@ -744,8 +795,8 @@ export const useGameStore = create<GameState>((set, get) => ({
           const { leveledUp, newLevel, newExpToNext } = calculateLevelUpStats(state.player.stats.level, newExp, state.player.stats.experienceToNext);
           if (leveledUp) {
             const newStats = calculateStats(state.player.vocation, newLevel);
-            addChatMessage({ type: 'system', sender: 'Level Up!', content: `🎉 Level ${newLevel}!`, color: '#f1c40f' });
-            return { player: { ...state.player, stats: { ...newStats, experience: newExp - state.player.stats.experienceToNext, health: newStats.maxHealth, mana: newStats.maxMana } }, levelUpTime: Date.now() };
+            addChatMessage({ type: 'system', sender: 'Level Up!', content: `🎉 Level ${newLevel}! +2 Skill Points! (Total: ${(newStats.skillPoints || 0) + 2})`, color: '#f1c40f' });
+            return { player: { ...state.player, stats: { ...newStats, experience: newExp - state.player.stats.experienceToNext, health: newStats.maxHealth, mana: newStats.maxMana, skillPoints: (newStats.skillPoints || 0) + 2 } }, levelUpTime: Date.now() };
           }
           return { player: { ...state.player, stats: { ...state.player.stats, experience: newExp } } };
         });
@@ -759,6 +810,44 @@ export const useGameStore = create<GameState>((set, get) => ({
         monsters: state.monsters.map(m => m.id === targetMonster.id ? { ...m, health: newMonsterHealth } : m),
       }));
       if (def) addChatMessage({ type: 'combat', sender: 'Skill', content: `${skill.icon} ${skill.name} hit ${def.name} for ${dmg}!`, color: skill.color });
+    }
+  },
+
+  upgradeSkill: (skillId) => {
+    const { player, skillUpgrades, addChatMessage } = get();
+    if (!player) return;
+
+    const currentLevel = skillUpgrades[skillId] || 0;
+    if (currentLevel >= 10) {
+      addChatMessage({ type: 'system', sender: 'Skills', content: 'Skill is already at max level!', color: '#e67e22' });
+      return;
+    }
+
+    if (player.stats.skillPoints < 1) {
+      addChatMessage({ type: 'system', sender: 'Skills', content: 'No skill points available! Level up to earn more.', color: '#e74c3c' });
+      return;
+    }
+
+    // Verify player has this skill
+    const skills = getSkillsForVocation(player.vocation);
+    if (!skills.find(s => s.id === skillId)) return;
+
+    set(state => ({
+      skillUpgrades: { ...state.skillUpgrades, [skillId]: (state.skillUpgrades[skillId] || 0) + 1 },
+      player: state.player ? {
+        ...state.player,
+        stats: { ...state.player.stats, skillPoints: state.player.stats.skillPoints - 1 },
+      } : null,
+    }));
+
+    const skill = skills.find(s => s.id === skillId);
+    if (skill) {
+      addChatMessage({
+        type: 'system',
+        sender: 'Skill Up!',
+        content: `${skill.icon} ${skill.name} upgraded to level ${currentLevel + 2}! (+20% dmg, -6% mana, -5% CD)`,
+        color: '#f1c40f'
+      });
     }
   },
 

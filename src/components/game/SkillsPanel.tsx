@@ -13,6 +13,8 @@ export default function SkillsPanel() {
   const castSkill = useGameStore((s) => s.castSkill);
   const skillCooldowns = useGameStore((s) => s.skillCooldowns);
   const buffEndTime = useGameStore((s) => s.buffEndTime);
+  const skillUpgrades = useGameStore((s) => s.skillUpgrades);
+  const upgradeSkill = useGameStore((s) => s.upgradeSkill);
   const [tick, setTick] = useState(0);
 
   // Force re-render for cooldown timers
@@ -107,6 +109,22 @@ export default function SkillsPanel() {
                     className={`absolute bottom-0 left-0 right-0 h-0.5 ${canAfford ? 'bg-blue-500/50' : 'bg-red-500/50'}`}
                   />
                 )}
+                {/* Upgrade level indicator */}
+                {!isLocked && (skillUpgrades[skill.id] || 0) > 0 && (
+                  <div className="absolute top-0 left-0 text-[7px] text-yellow-400 font-bold bg-black/70 rounded-br px-0.5">
+                    +{skillUpgrades[skill.id] || 0}
+                  </div>
+                )}
+                {/* Upgrade button */}
+                {!isLocked && player.stats.skillPoints > 0 && (skillUpgrades[skill.id] || 0) < 10 && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); upgradeSkill(skill.id); }}
+                    className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-yellow-500 hover:bg-yellow-400 text-black text-[9px] font-bold rounded-full flex items-center justify-center shadow-lg z-50 transition-colors"
+                    title={`Upgrade ${skill.name} (+20% dmg)`}
+                  >
+                    +
+                  </button>
+                )}
               </button>
 
               {/* Tooltip */}
@@ -121,10 +139,14 @@ export default function SkillsPanel() {
                     <span className="text-gray-400">⏱️ {skill.cooldown / 1000}s</span>
                   </div>
                   {skill.damage && (
-                    <div className="text-[10px] text-red-400 mt-1">⚔️ ~{skill.damage} damage (scales with Magic)</div>
+                    <div className="text-[10px] text-red-400 mt-1">
+                      ⚔️ ~{skill.damage} dmg{(skillUpgrades[skill.id] || 0) > 0 ? ` (↑${(skillUpgrades[skill.id] || 0) * 20}%)` : ' (scales with Magic)'}
+                    </div>
                   )}
                   {skill.healAmount && (
-                    <div className="text-[10px] text-green-400 mt-1">💚 ~{skill.healAmount} healing</div>
+                    <div className="text-[10px] text-green-400 mt-1">
+                      💚 ~{skill.healAmount} heal{(skillUpgrades[skill.id] || 0) > 0 ? ` (↑${(skillUpgrades[skill.id] || 0) * 20}%)` : ''}
+                    </div>
                   )}
                   <div className="text-[10px] text-amber-300 mt-1">Press <span className="text-amber-100 font-bold">{hotkey}</span> or click</div>
                   {isLocked && (
@@ -143,6 +165,12 @@ export default function SkillsPanel() {
         {hasBuff && (
           <div className="ml-2 px-2 py-1 bg-orange-600/30 border border-orange-500/50 rounded text-[10px] text-orange-300 font-bold animate-pulse">
             ⚔️ ATK+
+          </div>
+        )}
+        {/* Skill Points indicator */}
+        {player.stats.skillPoints > 0 && (
+          <div className="ml-2 px-2 py-1 bg-yellow-600/30 border border-yellow-500/50 rounded text-[10px] text-yellow-300 font-bold animate-pulse">
+            ⭐ {player.stats.skillPoints} SP
           </div>
         )}
 

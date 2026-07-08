@@ -238,3 +238,77 @@ Stage Summary:
 - Full difficulty progression from Rabbit (5 XP) to Kraken (2500 XP)
 - Two new legendary bosses: Lich King and Kraken with high-value loot tables
 - Overlapping zones (e.g. lich_lair with swamp_deep) add variety to existing areas
+
+---
+Task ID: 4
+Agent: general-purpose
+Task: Implement skill point upgrade system
+
+Work Log:
+- Added `skillUpgrades: Record<string, number>` and `upgradeSkill` action to GameState interface in game-store.ts
+- Initialized `skillUpgrades: {}` in store default state
+- Implemented `upgradeSkill(skillId)` action: validates skill ownership, max level 10, spends 1 SP, shows chat message with new level and bonuses
+- Modified both level-up code paths (attackMonster basic kill + castSkill kill) to grant 2 skill points on level up with updated chat message
+- Added upgrade multiplier calculations in castSkill: upgradeDmgMult (+20%/level), upgradeManaMult (-6%/level, min 40%), upgradeCdMult (-5%/level, min 40%)
+- Applied upgradeDmgMult to both damage spells and heal spells in castSkill
+- Replaced raw skill.manaCost with effectiveManaCost for mana checks and deduction
+- Replaced raw skill.cooldown with effectiveCooldown for cooldown checks
+- Updated SkillsPanel.tsx: imported skillUpgrades and upgradeSkill from store
+- Added "⭐ X SP" pulsing indicator in skill bar when player has skill points
+- Added upgrade level badge (top-left of skill icon) showing "+N" when upgrades > 0
+- Added yellow "+" upgrade button (top-right of skill icon) when SP > 0 and skill < max level
+- Updated damage/heal tooltips to show upgrade percentage when upgraded
+- Added "⭐ X SP" pulsing display in GameHUD next to gold counter
+- Pre-existing TS errors confirmed unrelated to changes (MonsterInstance.attack, socket.io types)
+
+Stage Summary:
+- Full skill point upgrade system implemented across 3 files
+- Players earn 2 SP per level up (both basic attack and skill kills)
+- Each of 3 vocation skills can be upgraded up to 10 times
+- Each upgrade: +20% damage/heal, -6% mana cost, -5% cooldown
+- UI shows available SP in HUD and skill bar, with clickable "+" buttons on each skill
+- Upgrade level badges on skill icons, tooltip shows upgrade percentage
+
+---
+Task ID: 2
+Agent: general-purpose
+Task: Add more items and slower XP with better per-level stat gains
+
+Work Log:
+- Added 12 new items to items.ts (before gold_coin entry):
+  - Weapons: shadow_blade (Epic, 30atk+20magAtk, lv20), sage_wand (Rare, 45magAtk, lv10), paladin_lance (Rare, 22atk+8magAtk, lv12)
+  - Armor: dragon_helmet (Epic, 15def+8magDef, lv22), mage_hood (Uncommon, 3def+10magDef, lv5), enchanted_shield (Epic, 18def+12magDef, lv18), paladin_boots (Uncommon, 3def, lv6)
+  - Accessories: amulet_of_wisdom (Epic, 12magAtk+8magDef, lv15), warrior_amulet (Rare, 8atk+5def, lv12), ring_of_fortune (Epic, +5 all stats, lv20)
+  - Potions: health_potion_grand (Uncommon, 250 HP, lv10), mana_potion_grand (Uncommon, 250 MP, lv10)
+- Added all 12 new item IDs to merchant's shopItems array in tilemap.ts (now 53 items total)
+- Changed XP curve in types.ts: Math.pow(1.3, ...) → Math.pow(1.55, ...) — significantly steeper leveling
+- Updated all 4 vocation per-level stat gains in types.ts (1.5-2x increases):
+  - Knight: HP/level 8→12, MP/level 5→8, Atk/level 1.5→2.5, Def/level 2→3.5, MagAtk/level 0.5→1, MagDef/level 1→1.5
+  - Sorcerer: HP/level 8→10, MP/level 20→30, Atk/level 0.5→1, Def/level 1.5→2.5, MagAtk/level 8→12, MagDef/level 5→7
+  - Druid: HP/level 8→11, MP/level 12→20, Atk/level 1→1.5, Def/level 2→3, MagAtk/level 3→5, MagDef/level 3→5
+  - Paladin: HP/level 10→13, MP/level 8→12, Atk/level 2.5→3.5, Def/level 3→4, MagAtk/level 1.5→2.5, MagDef/level 2→3
+
+Stage Summary:
+- Game now has 53+ items (was 41) including 3 new weapons, 4 new armor pieces, 3 new accessories, 2 new potions
+- Leveling is significantly slower (1.55x multiplier vs 1.3x), but each level feels more rewarding with 1.5-2x stat gains
+- All vocations benefit from better scaling: Knights are tankier, Sorcerers scale magic harder, Druids become hybrid powerhouses, Paladins get strong all-around growth
+
+---
+Task ID: 1
+Agent: general-purpose
+Task: Town protection system - monsters can't enter town, player can't enter town while in combat
+
+Work Log:
+- Added TOWN_BOUNDS constant (x:35, y:35, w:30, h:25) and isInTown() helper function in game-store.ts
+- Monster movement restriction: added isInTown checks to all 3 movement paths (diagonal, x-only, y-only) in the chase logic
+- Monster escape from town: if a monster somehow ends up in town, it loses its target and moves back toward spawn
+- Monster wander restriction: added isInTown check to random wander condition
+- Player combat restriction: movePlayer now blocks entering town if any alive monster has player as target, shows red chat message "⚠️ You can't enter town while in combat!"
+- Added addChatMessage to movePlayer's destructuring from get()
+- Added green "🛡️ SAFE" indicator below area name in GameCanvas.tsx when player is inside town bounds
+
+Stage Summary:
+- Town is now a true safe zone: monsters are physically blocked from entering and will flee if they somehow end up inside
+- Players cannot flee into town during combat (monsters aggroed on player block town entry)
+- Visual "🛡️ SAFE" indicator displayed in green when player stands in town
+- No new TypeScript errors introduced (all errors are pre-existing)

@@ -1057,6 +1057,17 @@ export default function GameCanvas() {
       ctx.fillText(areaName, canvasWidth / 2, 20);
     }
 
+    // Safe zone indicator
+    const inTown = currentPlayer.position.x >= 35 && currentPlayer.position.x < 65 && currentPlayer.position.y >= 35 && currentPlayer.position.y < 60;
+    if (inTown) {
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillText('🛡️ SAFE', canvasWidth / 2 + 1, 36);
+      ctx.fillStyle = '#2ecc71';
+      ctx.fillText('🛡️ SAFE', canvasWidth / 2, 35);
+    }
+
     // Level up celebration
     if (levelUpTime > 0) {
       renderLevelUpCelebration(ctx, canvasWidth, canvasHeight, levelUpTime);
