@@ -697,7 +697,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     // Calculate damage
-    const buffBonus = now < (get().buffEndTime) ? 1.3 : 1.0;
+    const buffBonus = now < (get().buffEndTime) ? 1.15 : 1.0;
     const magicPower = player.stats.magicAttack + (skill.damage || 0) * 0.3;
     const variance = 0.8 + Math.random() * 0.4;
     let dmg = Math.floor((skill.damage || 30) + magicPower * 0.5 * variance * buffBonus);

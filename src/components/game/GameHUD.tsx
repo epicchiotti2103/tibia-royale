@@ -72,8 +72,8 @@ export default function GameHUD() {
               <div className="text-amber-400 font-bold text-sm leading-tight">{player.name}</div>
               <div className="text-amber-200/60 text-xs">
                 {player.vocation} • Lv.{stats.level}
-                {time && <span className="ml-2 text-gray-500">{time}</span>}
               </div>
+              {time && <div className="text-gray-500 text-[10px] leading-tight">{time}</div>}
             </div>
           </div>
 

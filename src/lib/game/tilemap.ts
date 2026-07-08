@@ -240,6 +240,18 @@ export function generateGameMap(): GameMap {
         'enchanted_boots',
         'ring_of_life',
         'ring_of_mana',
+        'assassin_dagger',
+        'crystal_sword',
+        'divine_staff',
+        'holy_crossbow',
+        'druid_cloak',
+        'knight_armor',
+        'plate_legs',
+        'amulet_of_power',
+        'ring_of_fire',
+        'ring_of_ice',
+        'health_potion_ultra',
+        'mana_potion_ultra',
       ],
     },
     {
@@ -352,6 +364,78 @@ export function generateGameMap(): GameMap {
       monsterIds: ['scorpion', 'orc', 'troll'],
       maxMonsters: 15,
       spawnRate: 7000,
+    },
+    // Additional forest variety
+    {
+      id: 'forest_rabbits',
+      area: { x: 15, y: 5, width: 20, height: 15 },
+      monsterIds: ['rabbit', 'bee'],
+      maxMonsters: 15,
+      spawnRate: 3000,
+    },
+    // Bandit camp in forest
+    {
+      id: 'bandit_camp',
+      area: { x: 55, y: 12, width: 12, height: 8 },
+      monsterIds: ['bandit', 'goblin'],
+      maxMonsters: 10,
+      spawnRate: 5000,
+    },
+    // Desert bandits
+    {
+      id: 'desert_bandits',
+      area: { x: 15, y: 40, width: 15, height: 18 },
+      monsterIds: ['bandit', 'pirate', 'orc'],
+      maxMonsters: 15,
+      spawnRate: 6000,
+    },
+    // Swamp mushrooms and boars
+    {
+      id: 'swamp_creatures',
+      area: { x: 20, y: 75, width: 25, height: 20 },
+      monsterIds: ['mushroom', 'boar', 'scorpion'],
+      maxMonsters: 18,
+      spawnRate: 5000,
+    },
+    // Deep cave expansion - golems and necromancers
+    {
+      id: 'deep_cave_boss',
+      area: { x: 82, y: 22, width: 8, height: 10 },
+      monsterIds: ['golem', 'necromancer', 'vampire'],
+      maxMonsters: 8,
+      spawnRate: 12000,
+    },
+    // Snow peak expansion
+    {
+      id: 'frozen_peak',
+      area: { x: 88, y: 2, width: 10, height: 10 },
+      monsterIds: ['wraith', 'vampire', 'golem'],
+      maxMonsters: 10,
+      spawnRate: 8000,
+    },
+    // Lava fields expansion
+    {
+      id: 'inferno',
+      area: { x: 2, y: 88, width: 10, height: 10 },
+      monsterIds: ['fire_elemental', 'phoenix', 'demon', 'demon_lord'],
+      maxMonsters: 8,
+      spawnRate: 15000,
+    },
+    // Dark forest expansion
+    {
+      id: 'dark_forest_deep',
+      area: { x: 88, y: 88, width: 10, height: 10 },
+      monsterIds: ['dragon', 'ancient_dragon', 'hydra', 'lich_king'],
+      maxMonsters: 6,
+      spawnRate: 25000,
+    },
+    // New area: Lich King lair (south-east deep swamp)
+    {
+      id: 'lich_lair',
+      area: { x: 75, y: 85, width: 15, height: 13 },
+      monsterIds: ['vampire', 'necromancer', 'lich_king', 'kraken'],
+      maxMonsters: 6,
+      spawnRate: 20000,
     },
   ];
 
