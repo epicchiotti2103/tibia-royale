@@ -12,6 +12,7 @@ import NPCDialog from '@/components/game/NPCDialog';
 import GameLogin from '@/components/game/GameLogin';
 import DeathScreen from '@/components/game/DeathScreen';
 import SkillsPanel from '@/components/game/SkillsPanel';
+import SkillManagementPanel from '@/components/game/SkillManagementPanel';
 import QuestLog from '@/components/game/QuestLog';
 
 export default function HomePage() {
@@ -191,9 +192,12 @@ export default function HomePage() {
       {/* Death Screen Overlay */}
       {screen === 'dead' && <DeathScreen />}
 
+      {/* Skill Management Panel (overlay) */}
+      <SkillManagementPanel />
+
       {/* Controls hint */}
       <div className="absolute bottom-14 right-2 z-10 bg-black/60 rounded px-2 py-1 text-[10px] text-gray-500">
-        WASD: Move | SPC: Attack | I/O/P: Skills | Q: Potion | 1-9: Items | E: NPC
+        WASD: Move | SPC: Attack | I/O/P: Skills | K: Skill Panel | Q: Potion | 1-9: Items | E: NPC
       </div>
     </div>
   );

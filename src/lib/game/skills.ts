@@ -21,9 +21,12 @@ export interface SkillDef {
 }
 
 export const SKILL_HOTKEYS = ['I', 'O', 'P'] as const;
+export const MAX_EQUIPPED_SKILLS = 3;
 
 export const SKILLS: SkillDef[] = [
-  // Knight skills (melee-focused, lower damage but tanky)
+  // =============================================
+  // KNIGHT SKILLS (6 total - melee, tanky, area)
+  // =============================================
   {
     id: 'berserk',
     name: 'Berserk',
@@ -65,8 +68,51 @@ export const SKILLS: SkillDef[] = [
     levelReq: 10,
     color: '#e67e22',
   },
+  {
+    id: 'shield_bash',
+    name: 'Shield Bash',
+    description: 'Bash enemies with your shield, stunning them briefly.',
+    icon: '🛡️',
+    manaCost: 20,
+    cooldown: 4000,
+    type: 'attack',
+    range: 1,
+    vocation: [Vocation.KNIGHT],
+    levelReq: 3,
+    damage: 12,
+    color: '#7f8c8d',
+  },
+  {
+    id: 'cleave',
+    name: 'Cleave',
+    description: 'A devastating overhead strike that cleaves through armor.',
+    icon: '🪓',
+    manaCost: 40,
+    cooldown: 7000,
+    type: 'attack',
+    range: 1,
+    vocation: [Vocation.KNIGHT],
+    levelReq: 20,
+    damage: 50,
+    color: '#a93226',
+  },
+  {
+    id: 'iron_skin',
+    name: 'Iron Skin',
+    description: 'Harden your body, greatly reducing damage taken.',
+    icon: '🏋️',
+    manaCost: 25,
+    cooldown: 25000,
+    type: 'buff',
+    range: 0,
+    vocation: [Vocation.KNIGHT],
+    levelReq: 25,
+    color: '#95a5a6',
+  },
 
-  // Sorcerer skills (RANGED, high damage, fast casting)
+  // =============================================
+  // SORCERER SKILLS (6 total - ranged, high damage)
+  // =============================================
   {
     id: 'fireball',
     name: 'Fireball',
@@ -109,8 +155,51 @@ export const SKILLS: SkillDef[] = [
     damage: 400,
     color: '#9b59b6',
   },
+  {
+    id: 'ice_wave',
+    name: 'Ice Wave',
+    description: 'Send a freezing wave that damages and slows enemies.',
+    icon: '❄️',
+    manaCost: 25,
+    cooldown: 3000,
+    type: 'attack',
+    range: 3,
+    vocation: [Vocation.SORCERER],
+    levelReq: 5,
+    damage: 80,
+    color: '#00bcd4',
+  },
+  {
+    id: 'meteor',
+    name: 'Meteor Strike',
+    description: 'Call a meteor from the heavens, devastating a large area.',
+    icon: '☄️',
+    manaCost: 80,
+    cooldown: 8000,
+    type: 'attack',
+    range: 5,
+    vocation: [Vocation.SORCERER],
+    levelReq: 22,
+    damage: 600,
+    color: '#ff5722',
+  },
+  {
+    id: 'arcane_shield',
+    name: 'Arcane Shield',
+    description: 'Create a magical barrier that absorbs damage.',
+    icon: '🔮',
+    manaCost: 35,
+    cooldown: 30000,
+    type: 'buff',
+    range: 0,
+    vocation: [Vocation.SORCERER],
+    levelReq: 18,
+    color: '#7c4dff',
+  },
 
-  // Druid skills (healer/support with some AoE)
+  // =============================================
+  // DRUID SKILLS (6 total - healer/support/AoE)
+  // =============================================
   {
     id: 'heal',
     name: 'Heal',
@@ -153,8 +242,51 @@ export const SKILLS: SkillDef[] = [
     damage: 60,
     color: '#8B4513',
   },
+  {
+    id: 'thorns',
+    name: 'Thorn Shield',
+    description: 'Surround yourself with thorns that damage attackers.',
+    icon: '🌵',
+    manaCost: 20,
+    cooldown: 15000,
+    type: 'buff',
+    range: 0,
+    vocation: [Vocation.DRUID],
+    levelReq: 5,
+    color: '#4caf50',
+  },
+  {
+    id: 'nature_wrath',
+    name: "Nature's Wrath",
+    description: 'Command vines to ensnare and damage all nearby foes.',
+    icon: '🐍',
+    manaCost: 60,
+    cooldown: 6000,
+    type: 'attack',
+    range: 4,
+    vocation: [Vocation.DRUID],
+    levelReq: 18,
+    damage: 120,
+    color: '#1b5e20',
+  },
+  {
+    id: 'rejuvenation',
+    name: 'Rejuvenation',
+    description: 'Massive heal that restores a large portion of your health.',
+    icon: '🌸',
+    manaCost: 70,
+    cooldown: 12000,
+    type: 'heal',
+    range: 0,
+    vocation: [Vocation.DRUID],
+    levelReq: 20,
+    healAmount: 500,
+    color: '#e91e63',
+  },
 
-  // Paladin skills (ranged physical + some healing)
+  // =============================================
+  // PALADIN SKILLS (6 total - ranged physical + heal)
+  // =============================================
   {
     id: 'holy_arrow',
     name: 'Holy Arrow',
@@ -197,6 +329,47 @@ export const SKILLS: SkillDef[] = [
     healAmount: 100,
     color: '#f39c12',
   },
+  {
+    id: 'multi_shot',
+    name: 'Multi Shot',
+    description: 'Fire a volley of arrows hitting multiple enemies.',
+    icon: '🎯',
+    manaCost: 35,
+    cooldown: 5000,
+    type: 'attack',
+    range: 5,
+    vocation: [Vocation.PALADIN],
+    levelReq: 12,
+    damage: 40,
+    color: '#ff9800',
+  },
+  {
+    id: 'divine_judgment',
+    name: 'Divine Judgment',
+    description: 'Call down holy energy to smite a powerful foe.',
+    icon: '⚡',
+    manaCost: 55,
+    cooldown: 7000,
+    type: 'attack',
+    range: 7,
+    vocation: [Vocation.PALADIN],
+    levelReq: 20,
+    damage: 120,
+    color: '#ffeb3b',
+  },
+  {
+    id: 'consecration',
+    name: 'Consecration',
+    description: 'Bless the ground, boosting your attack and defense.',
+    icon: '⛪',
+    manaCost: 30,
+    cooldown: 20000,
+    type: 'buff',
+    range: 0,
+    vocation: [Vocation.PALADIN],
+    levelReq: 15,
+    color: '#ffc107',
+  },
 ];
 
 export function getSkillsForVocation(vocation: Vocation): SkillDef[] {
@@ -212,15 +385,27 @@ export function getSkillEffectType(skillId: string): 'sword_slash' | 'projectile
   switch (skillId) {
     case 'berserk':
     case 'whirlwind':
+    case 'cleave':
+    case 'multi_shot':
       return 'whirlwind';
     case 'fireball':
     case 'energy_beam':
+    case 'ice_wave':
+    case 'holy_arrow':
+    case 'divine_strike':
+    case 'divine_judgment':
       return 'projectile';
     case 'lightning':
+    case 'meteor':
       return 'lightning';
     case 'earthquake':
+    case 'nature_wrath':
       return 'earthquake';
     case 'war_cry':
+    case 'iron_skin':
+    case 'thorns':
+    case 'arcane_shield':
+    case 'consecration':
       return 'war_cry';
     default:
       return 'explosion';

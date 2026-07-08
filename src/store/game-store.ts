@@ -30,7 +30,7 @@ import {
   calculateLevelUpStats,
   generateLoot,
 } from '@/lib/game/combat';
-import { getSkillsForVocation, getSkillEffectType } from '@/lib/game/skills';
+import { getSkillsForVocation, getSkill, getSkillEffectType, MAX_EQUIPPED_SKILLS } from '@/lib/game/skills';
 
 export type GameScreen = 'login' | 'game' | 'dead';
 
@@ -75,11 +75,18 @@ interface GameState {
   spellEffects: SpellEffect[];
   addSpellEffect: (effect: Omit<SpellEffect, 'id'>) => void;
   cleanupSpellEffects: () => void;
-  castSkill: (skillIndex: number) => void;
+  castSkill: (hotkeyIndex: number) => void;
   skillCooldowns: Record<string, number>;
   buffEndTime: number;
   skillUpgrades: Record<string, number>;
   upgradeSkill: (skillId: string) => void;
+
+  // Skill Management
+  showSkillPanel: boolean;
+  toggleSkillPanel: () => void;
+  equippedSkillIds: string[];
+  equipSkill: (skillId: string) => void;
+  unequipSkill: (skillId: string) => void;
 
   // Visual feedback
   screenShakeTime: number;
@@ -162,11 +169,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       ],
       gold: 50,
     };
-    set({ player, screen: 'game' });
+    set({ player, screen: 'game', equippedSkillIds: getSkillsForVocation(vocation).slice(0, 3).map(s => s.id) });
     get().addChatMessage({
       type: 'system',
       sender: 'System',
-      content: `Welcome to Tibia Lands, ${name} the ${vocation}! WASD: Move | Space: Attack | I/O/P: Skills | Q1/Q2: Potions | 1-9: Items | E: Interact`,
+      content: `Welcome to Tibia Lands, ${name} the ${vocation}! WASD: Move | Space: Attack | I/O/P: Skills | K: Skill Panel | Q1/Q2: Potions | 1-9: Items | E: Interact`,
       color: '#f1c40f',
     });
   },
@@ -521,10 +528,19 @@ export const useGameStore = create<GameState>((set, get) => ({
 
           if (leveledUp) {
             const newStats = calculateStats(state.player.vocation, newLevel);
+            // Auto-improve all equipped skills by +1 on level up
+            const newUpgrades = { ...state.skillUpgrades };
+            for (const eqId of state.equippedSkillIds) {
+              if ((newUpgrades[eqId] || 0) < 10) {
+                newUpgrades[eqId] = (newUpgrades[eqId] || 0) + 1;
+              }
+            }
+            const prevSkillPoints = state.player.stats.skillPoints || 0;
+            const newSkillPoints = prevSkillPoints + 3;
             addChatMessage({
               type: 'system',
               sender: 'Level Up!',
-              content: `🎉 Level ${newLevel}! +2 Skill Points! (Total: ${(newStats.skillPoints || 0) + 2})`,
+              content: `🎉 Level ${newLevel}! +3 Skill Points! (Total: ${newSkillPoints}) All equipped skills auto-improved!`,
               color: '#f1c40f',
             });
             return {
@@ -535,10 +551,11 @@ export const useGameStore = create<GameState>((set, get) => ({
                   experience: newExp - state.player.stats.experienceToNext,
                   health: newStats.maxHealth,
                   mana: newStats.maxMana,
-                  skillPoints: (newStats.skillPoints || 0) + 2,
+                  skillPoints: newSkillPoints,
                 },
               },
               levelUpTime: Date.now(),
+              skillUpgrades: newUpgrades,
             };
           }
 
@@ -622,6 +639,29 @@ export const useGameStore = create<GameState>((set, get) => ({
   screenShakeTime: 0,
   levelUpTime: 0,
   lastAutoAttackTime: 0,
+  showSkillPanel: false,
+  toggleSkillPanel: () => set((s) => ({ showSkillPanel: !s.showSkillPanel })),
+  equippedSkillIds: [],
+  equipSkill: (skillId) => {
+    const { player, equippedSkillIds, addChatMessage } = get();
+    if (!player) return;
+    const skills = getSkillsForVocation(player.vocation);
+    if (!skills.find(s => s.id === skillId)) return;
+    if (equippedSkillIds.includes(skillId)) return;
+    if (equippedSkillIds.length >= MAX_EQUIPPED_SKILLS) {
+      addChatMessage({ type: 'system', sender: 'Skills', content: 'Unequip a skill first! Max 3 equipped.', color: '#e67e22' });
+      return;
+    }
+    set({ equippedSkillIds: [...equippedSkillIds, skillId] });
+    const sk = skills.find(s => s.id === skillId);
+    addChatMessage({ type: 'system', sender: 'Skills', content: `${sk?.icon} ${sk?.name} equipped!`, color: '#2ecc71' });
+  },
+  unequipSkill: (skillId) => {
+    const { equippedSkillIds, addChatMessage } = get();
+    if (!equippedSkillIds.includes(skillId)) return;
+    set({ equippedSkillIds: equippedSkillIds.filter(id => id !== skillId) });
+    addChatMessage({ type: 'system', sender: 'Skills', content: 'Skill unequipped.', color: '#95a5a6' });
+  },
   addSpellEffect: (effect) => {
     const ef: SpellEffect = {
       ...effect,
@@ -636,12 +676,13 @@ export const useGameStore = create<GameState>((set, get) => ({
     }));
   },
 
-  castSkill: (skillIndex) => {
-    const { player, monsters, addDamageNumber, addChatMessage, addSpellEffect, skillCooldowns, buffEndTime, addToInventory } = get();
+  castSkill: (hotkeyIndex) => {
+    const { player, monsters, addDamageNumber, addChatMessage, addSpellEffect, skillCooldowns, buffEndTime, addToInventory, equippedSkillIds } = get();
     if (!player) return;
 
-    const skills = getSkillsForVocation(player.vocation);
-    const skill = skills[skillIndex];
+    const skillId = equippedSkillIds[hotkeyIndex];
+    if (!skillId) return;
+    const skill = getSkill(skillId);
     if (!skill) return;
 
     const { skillUpgrades } = get();
@@ -795,8 +836,17 @@ export const useGameStore = create<GameState>((set, get) => ({
           const { leveledUp, newLevel, newExpToNext } = calculateLevelUpStats(state.player.stats.level, newExp, state.player.stats.experienceToNext);
           if (leveledUp) {
             const newStats = calculateStats(state.player.vocation, newLevel);
-            addChatMessage({ type: 'system', sender: 'Level Up!', content: `🎉 Level ${newLevel}! +2 Skill Points! (Total: ${(newStats.skillPoints || 0) + 2})`, color: '#f1c40f' });
-            return { player: { ...state.player, stats: { ...newStats, experience: newExp - state.player.stats.experienceToNext, health: newStats.maxHealth, mana: newStats.maxMana, skillPoints: (newStats.skillPoints || 0) + 2 } }, levelUpTime: Date.now() };
+            // Auto-improve all equipped skills by +1 on level up
+            const newUpgrades = { ...state.skillUpgrades };
+            for (const eqId of state.equippedSkillIds) {
+              if ((newUpgrades[eqId] || 0) < 10) {
+                newUpgrades[eqId] = (newUpgrades[eqId] || 0) + 1;
+              }
+            }
+            const prevSkillPoints = state.player.stats.skillPoints || 0;
+            const newSkillPoints = prevSkillPoints + 3;
+            addChatMessage({ type: 'system', sender: 'Level Up!', content: `🎉 Level ${newLevel}! +3 Skill Points! (Total: ${newSkillPoints}) All equipped skills auto-improved!`, color: '#f1c40f' });
+            return { player: { ...state.player, stats: { ...newStats, experience: newExp - state.player.stats.experienceToNext, health: newStats.maxHealth, mana: newStats.maxMana, skillPoints: newSkillPoints } }, levelUpTime: Date.now(), skillUpgrades: newUpgrades };
           }
           return { player: { ...state.player, stats: { ...state.player.stats, experience: newExp } } };
         });
@@ -814,8 +864,14 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   upgradeSkill: (skillId) => {
-    const { player, skillUpgrades, addChatMessage } = get();
+    const { player, skillUpgrades, addChatMessage, equippedSkillIds } = get();
     if (!player) return;
+
+    // Can only upgrade equipped skills
+    if (!equippedSkillIds.includes(skillId)) {
+      addChatMessage({ type: 'system', sender: 'Skills', content: 'Equip this skill first to upgrade it!', color: '#e67e22' });
+      return;
+    }
 
     const currentLevel = skillUpgrades[skillId] || 0;
     if (currentLevel >= 10) {

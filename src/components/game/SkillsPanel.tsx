@@ -2,11 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useGameStore } from '@/store/game-store';
-import { getSkillsForVocation, SKILL_HOTKEYS } from '@/lib/game/skills';
+import { getSkill, SKILL_HOTKEYS } from '@/lib/game/skills';
 import type { SkillDef } from '@/lib/game/skills';
-
-export { getSkillsForVocation, getSkill } from '@/lib/game/skills';
-export type { SkillDef } from '@/lib/game/skills';
 
 export default function SkillsPanel() {
   const player = useGameStore((s) => s.player);
@@ -14,7 +11,8 @@ export default function SkillsPanel() {
   const skillCooldowns = useGameStore((s) => s.skillCooldowns);
   const buffEndTime = useGameStore((s) => s.buffEndTime);
   const skillUpgrades = useGameStore((s) => s.skillUpgrades);
-  const upgradeSkill = useGameStore((s) => s.upgradeSkill);
+  const equippedSkillIds = useGameStore((s) => s.equippedSkillIds);
+  const toggleSkillPanel = useGameStore((s) => s.toggleSkillPanel);
   const [tick, setTick] = useState(0);
 
   // Force re-render for cooldown timers
@@ -25,9 +23,16 @@ export default function SkillsPanel() {
 
   if (!player) return null;
 
-  const skills = getSkillsForVocation(player.vocation);
   const now = Date.now();
   const hasBuff = now < buffEndTime;
+  const sp = player.stats.skillPoints || 0;
+
+  // Get equipped skill definitions
+  const equippedSkills: (SkillDef | undefined)[] = [];
+  for (let i = 0; i < 3; i++) {
+    const id = equippedSkillIds[i];
+    equippedSkills.push(id ? getSkill(id) : undefined);
+  }
 
   return (
     <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-20">
@@ -54,15 +59,39 @@ export default function SkillsPanel() {
         {/* Separator */}
         <div className="w-px h-8 bg-amber-700/30 mx-1 self-center" />
 
-        {/* Skill slots - I, O, P */}
-        {skills.map((skill: SkillDef, index: number) => {
+        {/* Equipped Skill slots - I, O, P */}
+        {equippedSkills.map((skill, index) => {
           const hotkey = SKILL_HOTKEYS[index] || '?';
+
+          // Empty slot
+          if (!skill) {
+            return (
+              <div key={`empty-${index}`} className="relative group">
+                <button
+                  onClick={toggleSkillPanel}
+                  className="w-12 h-12 rounded-lg border-2 border-dashed border-gray-700 bg-gray-900/50 hover:bg-gray-800/50 hover:border-gray-500 cursor-pointer transition-all flex flex-col items-center justify-center"
+                  title="Open Skill Panel (K) to equip a skill"
+                >
+                  <span className="text-lg leading-none text-gray-600">+</span>
+                  <span className="text-[8px] text-gray-500 leading-none mt-0.5 font-bold">{hotkey}</span>
+                </button>
+                <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50">
+                  <div className="bg-gray-900 border border-gray-600 rounded-lg p-2 w-40 shadow-xl">
+                    <div className="font-bold text-sm text-gray-400">Empty Slot ({hotkey})</div>
+                    <div className="text-[10px] text-gray-500 mt-1">Press <span className="text-amber-300">K</span> to equip a skill</div>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
           const lastUsed = skillCooldowns[skill.id] || 0;
           const isOnCooldown = now - lastUsed < skill.cooldown;
           const cooldownRemaining = isOnCooldown ? Math.ceil((skill.cooldown - (now - lastUsed)) / 1000) : 0;
           const cooldownPercent = isOnCooldown ? ((now - lastUsed) / skill.cooldown) * 100 : 0;
           const isLocked = player.stats.level < skill.levelReq;
           const canAfford = player.stats.mana >= skill.manaCost;
+          const upgradeLevel = skillUpgrades[skill.id] || 0;
 
           return (
             <div key={skill.id} className="relative group">
@@ -110,20 +139,10 @@ export default function SkillsPanel() {
                   />
                 )}
                 {/* Upgrade level indicator */}
-                {!isLocked && (skillUpgrades[skill.id] || 0) > 0 && (
+                {!isLocked && upgradeLevel > 0 && (
                   <div className="absolute top-0 left-0 text-[7px] text-yellow-400 font-bold bg-black/70 rounded-br px-0.5">
-                    +{skillUpgrades[skill.id] || 0}
+                    +{upgradeLevel}
                   </div>
-                )}
-                {/* Upgrade button */}
-                {!isLocked && player.stats.skillPoints > 0 && (skillUpgrades[skill.id] || 0) < 10 && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); upgradeSkill(skill.id); }}
-                    className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-yellow-500 hover:bg-yellow-400 text-black text-[9px] font-bold rounded-full flex items-center justify-center shadow-lg z-50 transition-colors"
-                    title={`Upgrade ${skill.name} (+20% dmg)`}
-                  >
-                    +
-                  </button>
                 )}
               </button>
 
@@ -132,6 +151,7 @@ export default function SkillsPanel() {
                 <div className="bg-gray-900 border border-gray-600 rounded-lg p-2 w-48 shadow-xl">
                   <div className="font-bold text-sm" style={{ color: skill.color }}>
                     {skill.icon} {skill.name}
+                    {upgradeLevel > 0 && <span className="text-yellow-400 ml-1">+{upgradeLevel}</span>}
                   </div>
                   <div className="text-[10px] text-gray-400 mt-1">{skill.description}</div>
                   <div className="flex gap-3 mt-1 text-[10px]">
@@ -140,12 +160,14 @@ export default function SkillsPanel() {
                   </div>
                   {skill.damage && (
                     <div className="text-[10px] text-red-400 mt-1">
-                      ⚔️ ~{skill.damage} dmg{(skillUpgrades[skill.id] || 0) > 0 ? ` (↑${(skillUpgrades[skill.id] || 0) * 20}%)` : ' (scales with Magic)'}
+                      ⚔️ ~{Math.floor(skill.damage * (1 + upgradeLevel * 0.2))} dmg
+                      {upgradeLevel > 0 && ` (↑${upgradeLevel * 20}%)`}
                     </div>
                   )}
                   {skill.healAmount && (
                     <div className="text-[10px] text-green-400 mt-1">
-                      💚 ~{skill.healAmount} heal{(skillUpgrades[skill.id] || 0) > 0 ? ` (↑${(skillUpgrades[skill.id] || 0) * 20}%)` : ''}
+                      💚 ~{Math.floor(skill.healAmount * (1 + upgradeLevel * 0.2))} heal
+                      {upgradeLevel > 0 && ` (↑${upgradeLevel * 20}%)`}
                     </div>
                   )}
                   <div className="text-[10px] text-amber-300 mt-1">Press <span className="text-amber-100 font-bold">{hotkey}</span> or click</div>
@@ -161,16 +183,36 @@ export default function SkillsPanel() {
           );
         })}
 
+        {/* Skill Panel Toggle Button */}
+        <div className="relative group">
+          <button
+            onClick={toggleSkillPanel}
+            className={`w-12 h-12 rounded-lg border-2 flex flex-col items-center justify-center transition-all hover:scale-110 active:scale-95 ${
+              sp > 0
+                ? 'border-yellow-500 bg-yellow-900/30 hover:bg-yellow-900/50 cursor-pointer animate-pulse'
+                : 'border-gray-600 bg-gray-900/90 hover:bg-gray-800 hover:border-gray-400 cursor-pointer'
+            }`}
+            title="Open Skill Panel (K)"
+          >
+            <span className="text-xl leading-none">{sp > 0 ? '⭐' : '📋'}</span>
+            <span className="text-[8px] text-gray-300 leading-none mt-0.5 font-bold">K</span>
+          </button>
+          <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50">
+            <div className="bg-gray-900 border border-gray-600 rounded-lg p-2 w-44 shadow-xl">
+              <div className="font-bold text-sm text-amber-400">⭐ Skill Panel</div>
+              <div className="text-[10px] text-gray-400 mt-1">Manage skills, equip/unequip, spend points.</div>
+              <div className="text-[10px] text-gray-500 mt-1">Press <span className="text-amber-300">K</span> to open</div>
+              {sp > 0 && (
+                <div className="text-[10px] text-yellow-400 mt-1 font-bold">🔥 {sp} points available!</div>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Buff indicator */}
         {hasBuff && (
-          <div className="ml-2 px-2 py-1 bg-orange-600/30 border border-orange-500/50 rounded text-[10px] text-orange-300 font-bold animate-pulse">
+          <div className="ml-1 px-2 py-1 bg-orange-600/30 border border-orange-500/50 rounded text-[10px] text-orange-300 font-bold animate-pulse">
             ⚔️ ATK+
-          </div>
-        )}
-        {/* Skill Points indicator */}
-        {player.stats.skillPoints > 0 && (
-          <div className="ml-2 px-2 py-1 bg-yellow-600/30 border border-yellow-500/50 rounded text-[10px] text-yellow-300 font-bold animate-pulse">
-            ⭐ {player.stats.skillPoints} SP
           </div>
         )}
 
@@ -201,8 +243,8 @@ function QuickPotionSlot({ type }: { type: 'hp' | 'mp' }) {
       isHP ? i.itemId.startsWith('health_potion') : i.itemId.startsWith('mana_potion')
     ).sort((a, b) => {
       const order = isHP
-        ? ['health_potion_large', 'health_potion_medium', 'health_potion_small']
-        : ['mana_potion_large', 'mana_potion_medium', 'mana_potion_small'];
+        ? ['health_potion_ultra', 'health_potion_large', 'health_potion_grand', 'health_potion_medium', 'health_potion_small']
+        : ['mana_potion_ultra', 'mana_potion_large', 'mana_potion_grand', 'mana_potion_medium', 'mana_potion_small'];
       return order.indexOf(a.itemId) - order.indexOf(b.itemId);
     });
 

@@ -312,3 +312,33 @@ Stage Summary:
 - Players cannot flee into town during combat (monsters aggroed on player block town entry)
 - Visual "🛡️ SAFE" indicator displayed in green when player stands in town
 - No new TypeScript errors introduced (all errors are pre-existing)
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Implement skill point allocation UI, expanded skill system, slower leveling, more items, town safety
+
+Work Log:
+- Read all current game files to understand the codebase
+- Identified that town safety zone was already implemented
+- Expanded skills.ts from 3 to 6 skills per vocation (24 total)
+- Added 18 new legendary/epic items across all equipment slots
+- Updated XP curve from 1.55x to 1.8x per level (much slower)
+- Increased per-level stat gains by ~40-60% across all vocations
+- Added equippedSkillIds state and equip/unequip actions to game-store
+- Added showSkillPanel toggle and K key handler
+- Updated castSkill to use equipped skills instead of vocation index
+- Updated level-up to grant 3 SP and auto-improve all equipped skills by +1
+- Created SkillManagementPanel.tsx with full equip/unequip and point allocation UI
+- Updated SkillsPanel to show only equipped skills with empty slot indicators
+- Added K key and Escape key handlers in GameCanvas
+- Added new items to merchant shop list
+- Verified in browser: game loads, skill panel opens, no errors
+
+Stage Summary:
+- 24 skills total (6 per vocation), player chooses 3 to equip via K panel
+- Skill points earned on level up (+3 per level), auto-improve equipped skills + manual allocation
+- Slower leveling (1.8x XP multiplier vs 1.55x), more impactful per-level gains
+- 18 new legendary/epic items added
+- Town safety zone was already working (monsters can't enter, combat blocks town entry)
+- Full skill management panel accessible via K key with equip/unequip/upgrade UI

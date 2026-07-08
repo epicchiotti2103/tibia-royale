@@ -1149,9 +1149,11 @@ export default function GameCanvas() {
       }
 
       // I, O, P = cast skills (Mac-friendly keys)
-      if (key === 'i') { e.preventDefault(); useGameStore.getState().castSkill(0); }
-      if (key === 'o') { e.preventDefault(); useGameStore.getState().castSkill(1); }
-      if (key === 'p') { e.preventDefault(); useGameStore.getState().castSkill(2); }
+      if (key === 'i') { e.preventDefault(); if (!useGameStore.getState().showSkillPanel) useGameStore.getState().castSkill(0); }
+      if (key === 'o') { e.preventDefault(); if (!useGameStore.getState().showSkillPanel) useGameStore.getState().castSkill(1); }
+      if (key === 'p') { e.preventDefault(); if (!useGameStore.getState().showSkillPanel) useGameStore.getState().castSkill(2); }
+      if (key === 'k') { e.preventDefault(); useGameStore.getState().toggleSkillPanel(); }
+      if (e.key === 'Escape') { e.preventDefault(); if (useGameStore.getState().showSkillPanel) useGameStore.getState().toggleSkillPanel(); }
 
       // Q1/Q2 = quick potions
       if (key === 'q') {
