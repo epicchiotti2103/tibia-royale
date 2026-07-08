@@ -92,6 +92,8 @@ interface GameState {
   screenShakeTime: number;
   levelUpTime: number;
   lastAutoAttackTime: number;
+  lastCombatTime: number;
+  setLastCombatTime: (time: number) => void;
 
   // Inventory
   addToInventory: (itemId: string, quantity: number) => void;
@@ -298,6 +300,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         } else if (dist <= def.attackRange && now - monster.lastAttackTime > def.attackSpeed) {
           // Attack player
           monster.lastAttackTime = now;
+          get().setLastCombatTime(Date.now());
           const result = monsterAttackPlayer(
             { ...monster, attack: def.attack, defense: def.defense },
             player.stats,
@@ -387,17 +390,25 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (isPositionBlocked(newX, newY, gameMap)) return;
 
     // Monster collision (don't walk on monsters)
-    if (isMonsterAt(newX, newY, monsters)) return;
-
-    // Can't enter town while in combat
-    if (isInTown(newX, newY)) {
-      const inCombat = monsters.some(m =>
-        !m.isDead && m.targetId === player.id
+    if (isMonsterAt(newX, newY, monsters)) {
+      // Only show message if the blocking monster is visible (nearby)
+      const blockingMonster = monsters.find(m =>
+        !m.isDead && m.position.x === newX && m.position.y === newY
       );
-      if (inCombat) {
-        addChatMessage({ type: 'system', sender: 'System', content: "⚠️ You can't enter town while in combat!", color: '#e74c3c' });
-        return;
+      if (blockingMonster) {
+        const def = MONSTERS[blockingMonster.definitionId];
+        if (def && Math.abs(blockingMonster.position.x - player.position.x) <= 1 && Math.abs(blockingMonster.position.y - player.position.y) <= 1) {
+          addChatMessage({ type: 'system', sender: 'System', content: `A ${def.name} is blocking your way!`, color: '#e67e22' });
+        }
       }
+      return;
+    }
+
+    // Can't enter town while in combat (5s since last fight action)
+    const { lastCombatTime } = get();
+    if (isInTown(newX, newY) && Date.now() - lastCombatTime < 5000) {
+      addChatMessage({ type: 'system', sender: 'System', content: "⚠️ You can't enter town while in combat! (wait 5s)", color: '#e74c3c' });
+      return;
     }
 
     set(state => ({
@@ -448,6 +459,9 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const def = MONSTERS[targetMonster.definitionId];
     if (!def) return;
+
+    // Mark combat time
+    get().setLastCombatTime(Date.now());
 
     const result = playerAttackMonster(player.stats, player.equipment, {
       ...targetMonster,
@@ -639,6 +653,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   screenShakeTime: 0,
   levelUpTime: 0,
   lastAutoAttackTime: 0,
+  lastCombatTime: 0,
+  setLastCombatTime: (time) => set({ lastCombatTime: time }),
   showSkillPanel: false,
   toggleSkillPanel: () => set((s) => ({ showSkillPanel: !s.showSkillPanel })),
   equippedSkillIds: [],
@@ -789,6 +805,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     // Calculate damage
+    get().setLastCombatTime(Date.now());
     const buffBonus = now < (get().buffEndTime) ? 1.15 : 1.0;
     const magicPower = player.stats.magicAttack + (skill.damage || 0) * 0.3;
     const variance = 0.8 + Math.random() * 0.4;
@@ -1166,24 +1183,30 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   respawn: () => {
-    const { player, gameMap, addChatMessage } = get();
+    const { player, gameMap, addChatMessage, monsters } = get();
     if (!player) return;
     const newStats = calculateStats(player.vocation, player.stats.level);
     // Lose 10% experience on death
     const xpLost = Math.floor(player.stats.experience * 0.1);
     const newExp = Math.max(0, player.stats.experience - xpLost);
-    set(state => ({
-      player: state.player ? {
-        ...state.player,
+    // Clear all monster targets and combat state on respawn
+    const clearedMonsters = monsters.map(m =>
+      m.targetId === player.id ? { ...m, targetId: undefined } : m
+    );
+    set({
+      player: player ? {
+        ...player,
         position: { ...gameMap.spawnPoint },
         stats: {
           ...newStats,
           experience: newExp,
-          experienceToNext: state.player.stats.experienceToNext,
+          experienceToNext: player.stats.experienceToNext,
         },
       } : null,
       screen: 'game' as GameScreen,
-    }));
+      lastCombatTime: 0,
+      monsters: clearedMonsters,
+    });
     addChatMessage({
       type: 'system',
       sender: 'System',
