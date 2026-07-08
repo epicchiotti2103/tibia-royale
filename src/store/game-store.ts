@@ -213,6 +213,7 @@ export const useGameStore = create<GameState>((set, get) => ({
             spawnPosition: { x: spawnX, y: spawnY },
             respawnTime: zone.spawnRate,
             isDead: false,
+            direction: Direction.SOUTH,
           });
         }
       }
@@ -240,6 +241,7 @@ export const useGameStore = create<GameState>((set, get) => ({
               position: { ...monster.spawnPosition },
               targetId: undefined,
               lastAttackTime: 0,
+              direction: Direction.SOUTH,
             };
           }
         }
@@ -275,6 +277,10 @@ export const useGameStore = create<GameState>((set, get) => ({
             const rY = monster.position.y + retY;
             if (!isPositionBlocked(rX, rY, gameMap)) {
               monster.position = { x: rX, y: rY };
+              if (retX > 0) monster.direction = Direction.EAST;
+              else if (retX < 0) monster.direction = Direction.WEST;
+              else if (retY > 0) monster.direction = Direction.SOUTH;
+              else if (retY < 0) monster.direction = Direction.NORTH;
             }
           }
           return { ...monster };
@@ -284,6 +290,12 @@ export const useGameStore = create<GameState>((set, get) => ({
           // Move towards player
           const moveX = dx > 0 ? 1 : dx < 0 ? -1 : 0;
           const moveY = dy > 0 ? 1 : dy < 0 ? -1 : 0;
+
+          // Update direction based on movement
+          if (moveX > 0) monster.direction = Direction.EAST;
+          else if (moveX < 0) monster.direction = Direction.WEST;
+          else if (moveY > 0) monster.direction = Direction.SOUTH;
+          else if (moveY < 0) monster.direction = Direction.NORTH;
 
           // Try to move
           let newX = monster.position.x + moveX;
@@ -338,8 +350,10 @@ export const useGameStore = create<GameState>((set, get) => ({
         // Random wander
         if (Math.random() < 0.01 * deltaTime) {
           const dirs = [
-            { x: 1, y: 0 }, { x: -1, y: 0 },
-            { x: 0, y: 1 }, { x: 0, y: -1 },
+            { x: 0, y: -1, d: Direction.NORTH },
+            { x: 1, y: 0, d: Direction.EAST },
+            { x: 0, y: 1, d: Direction.SOUTH },
+            { x: -1, y: 0, d: Direction.WEST },
           ];
           const dir = dirs[Math.floor(Math.random() * dirs.length)];
           const newX = monster.position.x + dir.x;
@@ -349,6 +363,7 @@ export const useGameStore = create<GameState>((set, get) => ({
               Math.abs(newY - monster.spawnPosition.y) < 8 &&
               !isInTown(newX, newY)) {
             monster.position = { x: newX, y: newY };
+            monster.direction = dir.d;
           }
         }
       }

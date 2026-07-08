@@ -134,6 +134,12 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     chaseRange: 7,
     attackRange: 1,
     attackSpeed: 1500,
+    sprites: {
+      north: '/sprites/wolf/north.jpg',
+      south: '/sprites/wolf/south.jpg',
+      east: '/sprites/wolf/east.jpg',
+      west: '/sprites/wolf/west.jpg',
+    },
   },
   scorpion: {
     id: 'scorpion',

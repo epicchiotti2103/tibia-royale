@@ -133,6 +133,13 @@ export interface ItemDefinition {
   icon: string; // emoji for UI
 }
 
+export interface MonsterSpriteSet {
+  north: string;
+  south: string;
+  east: string;
+  west: string;
+}
+
 export interface MonsterDefinition {
   id: string;
   name: string;
@@ -149,6 +156,7 @@ export interface MonsterDefinition {
   chaseRange: number;
   attackRange: number;
   attackSpeed: number; // ms between attacks
+  sprites?: MonsterSpriteSet; // optional directional image sprites
 }
 
 export interface LootDrop {
@@ -209,6 +217,7 @@ export interface MonsterInstance {
   respawnTime: number;
   isDead: boolean;
   deathTime?: number;
+  direction: Direction;
 }
 
 export interface OtherPlayer {

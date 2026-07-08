@@ -10,8 +10,55 @@ import {
   DamageNumber,
   SpellEffect,
   DIR_OFFSETS,
+  MonsterSpriteSet,
 } from '@/lib/game/types';
 import { MONSTERS } from '@/lib/game/monsters';
+
+// =============================================
+// Sprite image cache
+// =============================================
+const spriteCache: Record<string, HTMLImageElement> = {};
+const spriteLoadPromises: Record<string, Promise<void>> = {};
+
+function loadSprite(url: string): Promise<HTMLImageElement> {
+  if (spriteCache[url]) return Promise.resolve(spriteCache[url]);
+  if (spriteLoadPromises[url]) {
+    return spriteLoadPromises[url].then(() => spriteCache[url]);
+  }
+  spriteLoadPromises[url] = new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      spriteCache[url] = img;
+      resolve();
+    };
+    img.onerror = () => {
+      resolve(); // Don't block on error
+    };
+    img.src = url;
+  });
+  return spriteLoadPromises[url];
+}
+
+function preloadSprites() {
+  for (const def of Object.values(MONSTERS)) {
+    if (def.sprites) {
+      loadSprite(def.sprites.north);
+      loadSprite(def.sprites.south);
+      loadSprite(def.sprites.east);
+      loadSprite(def.sprites.west);
+    }
+  }
+}
+
+function getSpriteForDirection(sprites: MonsterSpriteSet, direction: Direction): string {
+  switch (direction) {
+    case Direction.NORTH: return sprites.north;
+    case Direction.EAST: return sprites.east;
+    case Direction.SOUTH: return sprites.south;
+    case Direction.WEST: return sprites.west;
+    default: return sprites.south;
+  }
+}
 
 function getDirection(dx: number, dy: number): Direction {
   if (Math.abs(dx) > Math.abs(dy)) {
@@ -261,17 +308,66 @@ function drawMonster(
   x: number,
   y: number,
   health: number,
-  maxHealth: number
+  maxHealth: number,
+  sprites?: MonsterSpriteSet,
+  direction?: Direction
 ) {
   const ts = TILE_SIZE;
   const cx = x + ts / 2;
   const cy = y + ts / 2;
 
+  // Shadow
   ctx.fillStyle = 'rgba(0,0,0,0.3)';
   ctx.beginPath();
   ctx.ellipse(cx, y + ts - 3, 10, 4, 0, 0, Math.PI * 2);
   ctx.fill();
 
+  // Try to draw sprite image if available
+  if (sprites && direction !== undefined) {
+    const spriteUrl = getSpriteForDirection(sprites, direction);
+    const img = spriteCache[spriteUrl];
+    if (img && img.complete && img.naturalWidth > 0) {
+      // Draw the sprite centered on the tile
+      const spriteSize = ts + 4; // slightly larger than tile
+      const sx = cx - spriteSize / 2;
+      const sy = cy - spriteSize / 2 - 2;
+      ctx.drawImage(img, sx, sy, spriteSize, spriteSize);
+    } else {
+      // Fallback to colored rectangle while loading
+      drawMonsterFallback(ctx, cx, cy, color);
+    }
+  } else {
+    // No sprites — draw classic colored monster
+    drawMonsterFallback(ctx, cx, cy, color);
+  }
+
+  // Name
+  ctx.fillStyle = '#ff6b6b';
+  ctx.font = 'bold 8px monospace';
+  ctx.textAlign = 'center';
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  ctx.strokeText(name, cx, y - 6);
+  ctx.fillText(name, cx, y - 6);
+
+  // Health bar
+  const barWidth = 30;
+  const barHeight = 3;
+  const barX = cx - barWidth / 2;
+  const barY = y - 2;
+  ctx.fillStyle = '#333';
+  ctx.fillRect(barX, barY, barWidth, barHeight);
+  const hpPercent = health / maxHealth;
+  ctx.fillStyle = hpPercent > 0.5 ? '#e74c3c' : hpPercent > 0.25 ? '#c0392b' : '#8b0000';
+  ctx.fillRect(barX, barY, barWidth * hpPercent, barHeight);
+}
+
+function drawMonsterFallback(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  color: string
+) {
   ctx.fillStyle = color;
   ctx.beginPath();
   ctx.roundRect(cx - 10, cy - 6, 20, 18, 4);
@@ -286,24 +382,6 @@ function drawMonster(
   ctx.arc(cx - 4, cy, 2, 0, Math.PI * 2);
   ctx.arc(cx + 4, cy, 2, 0, Math.PI * 2);
   ctx.fill();
-
-  ctx.fillStyle = '#ff6b6b';
-  ctx.font = 'bold 8px monospace';
-  ctx.textAlign = 'center';
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 2;
-  ctx.strokeText(name, cx, y - 6);
-  ctx.fillText(name, cx, y - 6);
-
-  const barWidth = 30;
-  const barHeight = 3;
-  const barX = cx - barWidth / 2;
-  const barY = y - 2;
-  ctx.fillStyle = '#333';
-  ctx.fillRect(barX, barY, barWidth, barHeight);
-  const hpPercent = health / maxHealth;
-  ctx.fillStyle = hpPercent > 0.5 ? '#e74c3c' : hpPercent > 0.25 ? '#c0392b' : '#8b0000';
-  ctx.fillRect(barX, barY, barWidth * hpPercent, barHeight);
 }
 
 // =============================================
@@ -994,7 +1072,7 @@ export default function GameCanvas() {
       const screenX = monster.position.x * TILE_SIZE - camX;
       const screenY = monster.position.y * TILE_SIZE - camY;
       if (screenX > -TILE_SIZE && screenX < canvasWidth && screenY > -TILE_SIZE && screenY < canvasHeight) {
-        drawMonster(ctx, def.name, def.color, def.icon, screenX, screenY, monster.health, monster.maxHealth);
+        drawMonster(ctx, def.name, def.color, def.icon, screenX, screenY, monster.health, monster.maxHealth, def.sprites, monster.direction as Direction);
       }
     }
 
@@ -1247,6 +1325,11 @@ export default function GameCanvas() {
     },
     []
   );
+
+  // Preload monster sprites
+  useEffect(() => {
+    preloadSprites();
+  }, []);
 
   // Canvas resize
   useEffect(() => {

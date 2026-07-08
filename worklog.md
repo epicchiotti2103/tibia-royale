@@ -342,3 +342,29 @@ Stage Summary:
 - 18 new legendary/epic items added
 - Town safety zone was already working (monsters can't enter, combat blocks town entry)
 - Full skill management panel accessible via K key with equip/unequip/upgrade UI
+---
+Task ID: 1
+Agent: Main Agent
+Task: Add wolf sprite images to the Tibia-style game
+
+Work Log:
+- Analyzed 4 uploaded wolf images using VLM to determine facing directions (north/south/east/west)
+- Copied images to public/sprites/wolf/ with direction-based naming (north.jpg, south.jpg, east.jpg, west.jpg)
+- Added `MonsterSpriteSet` interface to types.ts for directional sprite definitions
+- Added optional `sprites?: MonsterSpriteSet` field to `MonsterDefinition`
+- Added `direction: Direction` field to `MonsterInstance` for tracking monster facing
+- Updated wolf monster definition in monsters.ts with sprite paths
+- Updated `spawnMonsters` to set initial direction (SOUTH) for all monsters
+- Updated `updateMonsters` to track direction during: chasing player, returning to spawn, random wandering
+- Created sprite loading system in GameCanvas.tsx: `spriteCache`, `loadSprite()`, `preloadSprites()`, `getSpriteForDirection()`
+- Modified `drawMonster()` to accept optional sprites and direction, rendering image when available with fallback to colored rectangle
+- Added `drawMonsterFallback()` helper function
+- Called `preloadSprites()` in component useEffect
+- Updated the monster rendering call site to pass `def.sprites` and `monster.direction`
+
+Stage Summary:
+- Wolf sprites successfully implemented with directional rendering
+- All 4 wolf sprite images load correctly (verified via network requests: 200 status)
+- No compilation or runtime errors
+- System is extensible - any monster can now have sprites by adding a `sprites` field
+- Wolves spawn in desert (west of town) and swamp (south of town) areas
