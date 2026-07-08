@@ -13,6 +13,7 @@ export default function SkillsPanel() {
   const skillUpgrades = useGameStore((s) => s.skillUpgrades);
   const equippedSkillIds = useGameStore((s) => s.equippedSkillIds);
   const toggleSkillPanel = useGameStore((s) => s.toggleSkillPanel);
+  const upgradeSkill = useGameStore((s) => s.upgradeSkill);
   const [tick, setTick] = useState(0);
 
   // Force re-render for cooldown timers
@@ -36,6 +37,14 @@ export default function SkillsPanel() {
 
   return (
     <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-20">
+      {/* Floating SP banner */}
+      {sp > 0 && (
+        <div className="flex justify-center mb-1">
+          <div className="bg-gradient-to-r from-yellow-600/90 via-yellow-500/90 to-yellow-600/90 text-yellow-950 text-[11px] font-bold px-3 py-0.5 rounded-full shadow-lg shadow-yellow-500/30 animate-pulse border border-yellow-400/60 whitespace-nowrap">
+            ⭐ You have {sp} Skill Point{sp > 1 ? 's' : ''}! Click + on skills or press K
+          </div>
+        </div>
+      )}
       <div className="flex items-end gap-1 mb-1">
         {/* Basic Attack Slot */}
         <div className="relative group">
@@ -93,8 +102,31 @@ export default function SkillsPanel() {
           const canAfford = player.stats.mana >= skill.manaCost;
           const upgradeLevel = skillUpgrades[skill.id] || 0;
 
+          const canUpgrade = sp > 0 && !isLocked && upgradeLevel < 10;
+
           return (
             <div key={skill.id} className="relative group">
+              {/* Quick-spend SP button */}
+              {canUpgrade && (
+                <div className="absolute -top-1 -right-1 z-40 group/upgrade">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      upgradeSkill(skill.id);
+                    }}
+                    className="w-5 h-5 rounded-full bg-yellow-500 hover:bg-yellow-400 text-yellow-950 text-sm font-black leading-none flex items-center justify-center shadow-[0_0_8px_rgba(234,179,8,0.7)] hover:shadow-[0_0_12px_rgba(234,179,8,0.9)] animate-bounce cursor-pointer border border-yellow-300/60 transition-shadow"
+                  >
+                    +
+                  </button>
+                  <div className="hidden group-hover/upgrade:block absolute bottom-full right-0 mb-1 z-50">
+                    <div className="bg-gray-900 border border-yellow-500/60 rounded-lg p-1.5 w-44 shadow-xl">
+                      <div className="text-[10px] text-yellow-400 font-bold">
+                        Spend 1 SP on {skill.name} (+20% {skill.type === 'attack' ? 'dmg' : 'heal'})
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
               <button
                 onClick={() => !isLocked && !isOnCooldown && castSkill(index)}
                 disabled={isLocked || isOnCooldown}

@@ -218,6 +218,7 @@ export interface MonsterInstance {
   isDead: boolean;
   deathTime?: number;
   direction: Direction;
+  lastHitTime?: number;
 }
 
 export interface OtherPlayer {

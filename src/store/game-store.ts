@@ -611,7 +611,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         // Update monster health
         set(state => ({
           monsters: state.monsters.map(m =>
-            m.id === targetMonster.id ? { ...m, health: newMonsterHealth } : m
+            m.id === targetMonster.id ? { ...m, health: newMonsterHealth, lastHitTime: Date.now() } : m
           ),
         }));
       }
@@ -889,7 +889,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       }));
     } else {
       set(state => ({
-        monsters: state.monsters.map(m => m.id === targetMonster.id ? { ...m, health: newMonsterHealth } : m),
+        monsters: state.monsters.map(m => m.id === targetMonster.id ? { ...m, health: newMonsterHealth, lastHitTime: Date.now() } : m),
       }));
       if (def) addChatMessage({ type: 'combat', sender: 'Skill', content: `${skill.icon} ${skill.name} hit ${def.name} for ${dmg}!`, color: skill.color });
     }

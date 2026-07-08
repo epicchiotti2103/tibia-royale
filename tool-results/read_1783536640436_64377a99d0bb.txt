@@ -1,0 +1,1384 @@
+     1→'use client';
+     2→
+     3→import React, { useEffect, useRef, useCallback } from 'react';
+     4→import { useGameStore } from '@/store/game-store';
+     5→import {
+     6→  TILE_SIZE,
+     7→  TileType,
+     8→  Direction,
+     9→  TILE_COLORS,
+    10→  DamageNumber,
+    11→  SpellEffect,
+    12→  DIR_OFFSETS,
+    13→  MonsterSpriteSet,
+    14→} from '@/lib/game/types';
+    15→import { MONSTERS } from '@/lib/game/monsters';
+    16→
+    17→// =============================================
+    18→// Sprite image cache
+    19→// =============================================
+    20→const spriteCache: Record<string, HTMLImageElement> = {};
+    21→const spriteLoadPromises: Record<string, Promise<void>> = {};
+    22→
+    23→function loadSprite(url: string): Promise<HTMLImageElement> {
+    24→  if (spriteCache[url]) return Promise.resolve(spriteCache[url]);
+    25→  if (spriteLoadPromises[url]) {
+    26→    return spriteLoadPromises[url].then(() => spriteCache[url]);
+    27→  }
+    28→  spriteLoadPromises[url] = new Promise((resolve) => {
+    29→    const img = new Image();
+    30→    img.onload = () => {
+    31→      spriteCache[url] = img;
+    32→      resolve();
+    33→    };
+    34→    img.onerror = () => {
+    35→      resolve(); // Don't block on error
+    36→    };
+    37→    img.src = url;
+    38→  });
+    39→  return spriteLoadPromises[url];
+    40→}
+    41→
+    42→function preloadSprites() {
+    43→  for (const def of Object.values(MONSTERS)) {
+    44→    if (def.sprites) {
+    45→      loadSprite(def.sprites.north);
+    46→      loadSprite(def.sprites.south);
+    47→      loadSprite(def.sprites.east);
+    48→      loadSprite(def.sprites.west);
+    49→    }
+    50→  }
+    51→}
+    52→
+    53→function getSpriteForDirection(sprites: MonsterSpriteSet, direction: Direction): string {
+    54→  switch (direction) {
+    55→    case Direction.NORTH: return sprites.north;
+    56→    case Direction.EAST: return sprites.east;
+    57→    case Direction.SOUTH: return sprites.south;
+    58→    case Direction.WEST: return sprites.west;
+    59→    default: return sprites.south;
+    60→  }
+    61→}
+    62→
+    63→function getDirection(dx: number, dy: number): Direction {
+    64→  if (Math.abs(dx) > Math.abs(dy)) {
+    65→    return dx > 0 ? Direction.EAST : Direction.WEST;
+    66→  }
+    67→  return dy > 0 ? Direction.SOUTH : Direction.NORTH;
+    68→}
+    69→
+    70→// =============================================
+    71→// Tile detail rendering
+    72→// =============================================
+    73→function drawTileDetail(ctx: CanvasRenderingContext2D, tile: TileType, x: number, y: number) {
+    74→  const ts = TILE_SIZE;
+    75→  switch (tile) {
+    76→    case TileType.GRASS: {
+    77→      ctx.fillStyle = '#5a8c4f';
+    78→      for (let i = 0; i < 3; i++) {
+    79→        const gx = x + 5 + (i * 10) + Math.sin(x + y + i) * 3;
+    80→        const gy = y + ts - 8 - (i * 4);
+    81→        ctx.fillRect(gx, gy, 2, 6);
+    82→      }
+    83→      break;
+    84→    }
+    85→    case TileType.WATER: {
+    86→      ctx.fillStyle = 'rgba(100,180,255,0.3)';
+    87→      const time = Date.now() / 1000;
+    88→      ctx.fillRect(x + 4 + Math.sin(time + x) * 2, y + 8, 8, 2);
+    89→      ctx.fillRect(x + 16 + Math.cos(time + y) * 2, y + 20, 10, 2);
+    90→      break;
+    91→    }
+    92→    case TileType.TREE: {
+    93→      ctx.fillStyle = '#5a3a1a';
+    94→      ctx.fillRect(x + ts / 2 - 2, y + ts / 2, 4, ts / 2);
+    95→      ctx.fillStyle = '#1a6b0e';
+    96→      ctx.beginPath();
+    97→      ctx.arc(x + ts / 2, y + ts / 2 - 2, 10, 0, Math.PI * 2);
+    98→      ctx.fill();
+    99→      ctx.fillStyle = '#228b1a';
+   100→      ctx.beginPath();
+   101→      ctx.arc(x + ts / 2 - 3, y + ts / 2 - 4, 6, 0, Math.PI * 2);
+   102→      ctx.fill();
+   103→      break;
+   104→    }
+   105→    case TileType.WALL: {
+   106→      ctx.fillStyle = '#4a4a4a';
+   107→      ctx.fillRect(x + 1, y + 1, ts - 2, ts - 2);
+   108→      ctx.strokeStyle = '#3a3a3a';
+   109→      ctx.lineWidth = 1;
+   110→      ctx.strokeRect(x + 1, y + 1, ts - 2, ts - 2);
+   111→      ctx.beginPath();
+   112→      ctx.moveTo(x, y + ts / 2);
+   113→      ctx.lineTo(x + ts, y + ts / 2);
+   114→      ctx.stroke();
+   115→      break;
+   116→    }
+   117→    case TileType.ROCK: {
+   118→      ctx.fillStyle = '#555';
+   119→      ctx.beginPath();
+   120→      ctx.ellipse(x + ts / 2, y + ts / 2 + 2, 12, 8, 0, 0, Math.PI * 2);
+   121→      ctx.fill();
+   122→      ctx.fillStyle = '#666';
+   123→      ctx.beginPath();
+   124→      ctx.ellipse(x + ts / 2, y + ts / 2, 10, 6, 0, 0, Math.PI * 2);
+   125→      ctx.fill();
+   126→      break;
+   127→    }
+   128→    case TileType.LAVA: {
+   129→      const time = Date.now() / 500;
+   130→      ctx.fillStyle = `rgba(255, ${100 + Math.sin(time + x) * 50}, 0, 0.6)`;
+   131→      ctx.fillRect(x, y, ts, ts);
+   132→      ctx.fillStyle = `rgba(255, 200, 0, ${0.3 + Math.sin(time * 2 + y) * 0.2})`;
+   133→      ctx.fillRect(x + 8 + Math.sin(time) * 3, y + 8, 8, 8);
+   134→      break;
+   135→    }
+   136→    case TileType.BUSH: {
+   137→      ctx.fillStyle = '#2a6a1e';
+   138→      ctx.beginPath();
+   139→      ctx.arc(x + ts / 2, y + ts / 2, 8, 0, Math.PI * 2);
+   140→      ctx.fill();
+   141→      ctx.fillStyle = '#3a8a2e';
+   142→      ctx.beginPath();
+   143→      ctx.arc(x + ts / 2 + 3, y + ts / 2 - 2, 6, 0, Math.PI * 2);
+   144→      ctx.fill();
+   145→      break;
+   146→    }
+   147→    case TileType.BRIDGE: {
+   148→      ctx.fillStyle = '#7a5914';
+   149→      ctx.fillRect(x + 2, y, ts - 4, ts);
+   150→      ctx.fillStyle = '#6a4904';
+   151→      for (let i = 0; i < 4; i++) {
+   152→        ctx.fillRect(x + 2, y + i * 8, ts - 4, 1);
+   153→      }
+   154→      break;
+   155→    }
+   156→    case TileType.DARK_GRASS: {
+   157→      ctx.fillStyle = '#3a6a35';
+   158→      for (let i = 0; i < 4; i++) {
+   159→        const gx = x + 3 + (i * 7) + Math.sin(x + y + i) * 2;
+   160→        const gy = y + ts - 6 - (i * 3);
+   161→        ctx.fillRect(gx, gy, 1, 5);
+   162→      }
+   163→      break;
+   164→    }
+   165→    case TileType.SWAMP: {
+   166→      ctx.fillStyle = '#3a5b2a';
+   167→      ctx.fillRect(x + 6 + Math.sin(Date.now() / 2000 + x) * 2, y + 12, 6, 2);
+   168→      ctx.fillRect(x + 18 + Math.cos(Date.now() / 2500 + y) * 2, y + 22, 8, 2);
+   169→      break;
+   170→    }
+   171→    case TileType.SNOW: {
+   172→      ctx.fillStyle = 'rgba(200,220,255,0.3)';
+   173→      ctx.fillRect(x + 5, y + 10, 3, 2);
+   174→      ctx.fillRect(x + 20, y + 18, 4, 2);
+   175→      break;
+   176→    }
+   177→    default:
+   178→      break;
+   179→  }
+   180→}
+   181→
+   182→// =============================================
+   183→// Player sprite rendering
+   184→// =============================================
+   185→function drawPlayerSprite(
+   186→  ctx: CanvasRenderingContext2D,
+   187→  name: string,
+   188→  x: number,
+   189→  y: number,
+   190→  direction: Direction,
+   191→  color: string,
+   192→  level: number,
+   193→  health: number,
+   194→  maxHealth: number,
+   195→  hasBuff: boolean
+   196→) {
+   197→  const ts = TILE_SIZE;
+   198→  const cx = x + ts / 2;
+   199→  const cy = y + ts / 2;
+   200→
+   201→  // Buff aura
+   202→  if (hasBuff) {
+   203→    const time = Date.now() / 300;
+   204→    ctx.strokeStyle = `rgba(255, 165, 0, ${0.3 + Math.sin(time) * 0.2})`;
+   205→    ctx.lineWidth = 2;
+   206→    ctx.beginPath();
+   207→    ctx.arc(cx, cy, 16 + Math.sin(time) * 2, 0, Math.PI * 2);
+   208→    ctx.stroke();
+   209→  }
+   210→
+   211→  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+   212→  ctx.beginPath();
+   213→  ctx.ellipse(cx, y + ts - 3, 10, 4, 0, 0, Math.PI * 2);
+   214→  ctx.fill();
+   215→
+   216→  ctx.fillStyle = color;
+   217→  ctx.fillRect(cx - 6, cy - 4, 12, 14);
+   218→
+   219→  ctx.fillStyle = '#ffdbac';
+   220→  ctx.beginPath();
+   221→  ctx.arc(cx, cy - 6, 7, 0, Math.PI * 2);
+   222→  ctx.fill();
+   223→
+   224→  ctx.fillStyle = '#5a3a1a';
+   225→  ctx.beginPath();
+   226→  ctx.arc(cx, cy - 9, 7, Math.PI, 0);
+   227→  ctx.fill();
+   228→
+   229→  ctx.fillStyle = '#000';
+   230→  if (direction === Direction.SOUTH) {
+   231→    ctx.fillRect(cx - 3, cy - 7, 2, 2);
+   232→    ctx.fillRect(cx + 1, cy - 7, 2, 2);
+   233→  } else if (direction === Direction.EAST) {
+   234→    ctx.fillRect(cx + 1, cy - 7, 2, 2);
+   235→  } else if (direction === Direction.WEST) {
+   236→    ctx.fillRect(cx - 3, cy - 7, 2, 2);
+   237→  }
+   238→
+   239→  // Weapon (sword) in hand
+   240→  ctx.fillStyle = '#a0a0a0';
+   241→  ctx.strokeStyle = '#707070';
+   242→  ctx.lineWidth = 1;
+   243→  const dirOff = DIR_OFFSETS[direction];
+   244→  const swordX = cx + dirOff.x * 14;
+   245→  const swordY = cy + dirOff.y * 14;
+   246→  ctx.save();
+   247→  ctx.translate(swordX, swordY);
+   248→  const angle = direction === Direction.NORTH ? -Math.PI / 2 : direction === Direction.SOUTH ? Math.PI / 2 : direction === Direction.EAST ? 0 : Math.PI;
+   249→  ctx.rotate(angle);
+   250→  // Sword blade
+   251→  ctx.fillStyle = '#c0c0c0';
+   252→  ctx.fillRect(-1, -12, 3, 12);
+   253→  // Sword tip
+   254→  ctx.beginPath();
+   255→  ctx.moveTo(-1, -12);
+   256→  ctx.lineTo(0.5, -16);
+   257→  ctx.lineTo(2, -12);
+   258→  ctx.fill();
+   259→  // Handle
+   260→  ctx.fillStyle = '#8B4513';
+   261→  ctx.fillRect(-2, 0, 5, 4);
+   262→  // Guard
+   263→  ctx.fillStyle = '#DAA520';
+   264→  ctx.fillRect(-3, -1, 7, 2);
+   265→  ctx.restore();
+   266→
+   267→  ctx.fillStyle = color;
+   268→  ctx.beginPath();
+   269→  ctx.moveTo(cx + dirOff.x * 18, cy + dirOff.y * 18);
+   270→  ctx.lineTo(cx + dirOff.x * 14 + (dirOff.y !== 0 ? -3 : 0), cy + dirOff.y * 14 + (dirOff.x !== 0 ? -3 : 0));
+   271→  ctx.lineTo(cx + dirOff.x * 14 + (dirOff.y !== 0 ? 3 : 0), cy + dirOff.y * 14 + (dirOff.x !== 0 ? 3 : 0));
+   272→  ctx.fill();
+   273→
+   274→  ctx.fillStyle = '#fff';
+   275→  ctx.font = 'bold 9px monospace';
+   276→  ctx.textAlign = 'center';
+   277→  ctx.strokeStyle = '#000';
+   278→  ctx.lineWidth = 2;
+   279→  ctx.strokeText(name, cx, y - 8);
+   280→  ctx.fillText(name, cx, y - 8);
+   281→
+   282→  ctx.font = '7px monospace';
+   283→  ctx.fillStyle = '#f1c40f';
+   284→  ctx.strokeText(`Lv.${level}`, cx, y - 0);
+   285→  ctx.fillText(`Lv.${level}`, cx, y - 0);
+   286→
+   287→  if (health < maxHealth) {
+   288→    const barWidth = 28;
+   289→    const barHeight = 3;
+   290→    const barX = cx - barWidth / 2;
+   291→    const barY = y - 3;
+   292→    ctx.fillStyle = '#333';
+   293→    ctx.fillRect(barX, barY, barWidth, barHeight);
+   294→    const hpPercent = health / maxHealth;
+   295→    ctx.fillStyle = hpPercent > 0.5 ? '#2ecc71' : hpPercent > 0.25 ? '#f39c12' : '#e74c3c';
+   296→    ctx.fillRect(barX, barY, barWidth * hpPercent, barHeight);
+   297→  }
+   298→}
+   299→
+   300→// =============================================
+   301→// Monster rendering
+   302→// =============================================
+   303→function drawMonster(
+   304→  ctx: CanvasRenderingContext2D,
+   305→  name: string,
+   306→  color: string,
+   307→  _icon: string,
+   308→  x: number,
+   309→  y: number,
+   310→  health: number,
+   311→  maxHealth: number,
+   312→  sprites?: MonsterSpriteSet,
+   313→  direction?: Direction
+   314→) {
+   315→  const ts = TILE_SIZE;
+   316→  const cx = x + ts / 2;
+   317→  const cy = y + ts / 2;
+   318→
+   319→  // Shadow
+   320→  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+   321→  ctx.beginPath();
+   322→  ctx.ellipse(cx, y + ts - 3, 10, 4, 0, 0, Math.PI * 2);
+   323→  ctx.fill();
+   324→
+   325→  // Try to draw sprite image if available
+   326→  if (sprites && direction !== undefined) {
+   327→    const spriteUrl = getSpriteForDirection(sprites, direction);
+   328→    const img = spriteCache[spriteUrl];
+   329→    if (img && img.complete && img.naturalWidth > 0) {
+   330→      // Draw the sprite centered on the tile
+   331→      const spriteSize = ts + 4; // slightly larger than tile
+   332→      const sx = cx - spriteSize / 2;
+   333→      const sy = cy - spriteSize / 2 - 2;
+   334→      ctx.drawImage(img, sx, sy, spriteSize, spriteSize);
+   335→    } else {
+   336→      // Fallback to colored rectangle while loading
+   337→      drawMonsterFallback(ctx, cx, cy, color);
+   338→    }
+   339→  } else {
+   340→    // No sprites — draw classic colored monster
+   341→    drawMonsterFallback(ctx, cx, cy, color);
+   342→  }
+   343→
+   344→  // Name
+   345→  ctx.fillStyle = '#ff6b6b';
+   346→  ctx.font = 'bold 8px monospace';
+   347→  ctx.textAlign = 'center';
+   348→  ctx.strokeStyle = '#000';
+   349→  ctx.lineWidth = 2;
+   350→  ctx.strokeText(name, cx, y - 6);
+   351→  ctx.fillText(name, cx, y - 6);
+   352→
+   353→  // Health bar
+   354→  const barWidth = 30;
+   355→  const barHeight = 3;
+   356→  const barX = cx - barWidth / 2;
+   357→  const barY = y - 2;
+   358→  ctx.fillStyle = '#333';
+   359→  ctx.fillRect(barX, barY, barWidth, barHeight);
+   360→  const hpPercent = health / maxHealth;
+   361→  ctx.fillStyle = hpPercent > 0.5 ? '#e74c3c' : hpPercent > 0.25 ? '#c0392b' : '#8b0000';
+   362→  ctx.fillRect(barX, barY, barWidth * hpPercent, barHeight);
+   363→}
+   364→
+   365→function drawMonsterFallback(
+   366→  ctx: CanvasRenderingContext2D,
+   367→  cx: number,
+   368→  cy: number,
+   369→  color: string
+   370→) {
+   371→  ctx.fillStyle = color;
+   372→  ctx.beginPath();
+   373→  ctx.roundRect(cx - 10, cy - 6, 20, 18, 4);
+   374→  ctx.fill();
+   375→
+   376→  ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+   377→  ctx.lineWidth = 1;
+   378→  ctx.stroke();
+   379→
+   380→  ctx.fillStyle = '#ff0000';
+   381→  ctx.beginPath();
+   382→  ctx.arc(cx - 4, cy, 2, 0, Math.PI * 2);
+   383→  ctx.arc(cx + 4, cy, 2, 0, Math.PI * 2);
+   384→  ctx.fill();
+   385→}
+   386→
+   387→// =============================================
+   388→// NPC rendering
+   389→// =============================================
+   390→function drawNPC(
+   391→  ctx: CanvasRenderingContext2D,
+   392→  name: string,
+   393→  color: string,
+   394→  _icon: string,
+   395→  x: number,
+   396→  y: number
+   397→) {
+   398→  const ts = TILE_SIZE;
+   399→  const cx = x + ts / 2;
+   400→  const cy = y + ts / 2;
+   401→
+   402→  ctx.fillStyle = `${color}22`;
+   403→  ctx.beginPath();
+   404→  ctx.arc(cx, cy, 18, 0, Math.PI * 2);
+   405→  ctx.fill();
+   406→
+   407→  ctx.fillStyle = color;
+   408→  ctx.fillRect(cx - 6, cy - 2, 12, 12);
+   409→
+   410→  ctx.fillStyle = '#ffdbac';
+   411→  ctx.beginPath();
+   412→  ctx.arc(cx, cy - 5, 6, 0, Math.PI * 2);
+   413→  ctx.fill();
+   414→
+   415→  ctx.fillStyle = color;
+   416→  ctx.beginPath();
+   417→  ctx.arc(cx, cy - 8, 6, Math.PI, 0);
+   418→  ctx.fill();
+   419→
+   420→  ctx.fillStyle = '#f1c40f';
+   421→  ctx.font = 'bold 9px monospace';
+   422→  ctx.textAlign = 'center';
+   423→  ctx.strokeStyle = '#000';
+   424→  ctx.lineWidth = 2;
+   425→  ctx.strokeText(name, cx, y - 10);
+   426→  ctx.fillText(name, cx, y - 10);
+   427→
+   428→  const time = Date.now() / 500;
+   429→  const bounce = Math.sin(time) * 2;
+   430→  ctx.fillStyle = '#f1c40f';
+   431→  ctx.font = '10px sans-serif';
+   432→  ctx.fillText('!', cx, y - 18 + bounce);
+   433→}
+   434→
+   435→// =============================================
+   436→// Damage number rendering
+   437→// =============================================
+   438→function renderDamageNumbers(
+   439→  ctx: CanvasRenderingContext2D,
+   440→  numbers: DamageNumber[],
+   441→  camX: number,
+   442→  camY: number
+   443→) {
+   444→  const now = Date.now();
+   445→  for (const dn of numbers) {
+   446→    const age = now - dn.timestamp;
+   447→    const alpha = Math.max(0, 1 - age / 2000);
+   448→    const yOffset = -age / 100;
+   449→
+   450→    const screenX = dn.position.x * TILE_SIZE + TILE_SIZE / 2 - camX;
+   451→    const screenY = dn.position.y * TILE_SIZE + yOffset - camY;
+   452→
+   453→    ctx.globalAlpha = alpha;
+   454→    ctx.font = 'bold 12px monospace';
+   455→    ctx.textAlign = 'center';
+   456→
+   457→    if (dn.type === 'damage') {
+   458→      ctx.fillStyle = '#ff0000';
+   459→      ctx.strokeStyle = '#000';
+   460→      ctx.lineWidth = 2;
+   461→      const text = `-${Math.abs(dn.value)}`;
+   462→      ctx.strokeText(text, screenX, screenY);
+   463→      ctx.fillText(text, screenX, screenY);
+   464→    } else if (dn.type === 'heal') {
+   465→      ctx.fillStyle = '#00ff00';
+   466→      ctx.strokeStyle = '#000';
+   467→      ctx.lineWidth = 2;
+   468→      const text = `+${dn.value}`;
+   469→      ctx.strokeText(text, screenX, screenY);
+   470→      ctx.fillText(text, screenX, screenY);
+   471→    } else if (dn.type === 'miss') {
+   472→      ctx.fillStyle = '#888';
+   473→      const text = 'MISS';
+   474→      ctx.fillText(text, screenX, screenY);
+   475→    } else if (dn.type === 'xp') {
+   476→      ctx.fillStyle = '#f1c40f';
+   477→      ctx.strokeStyle = '#000';
+   478→      ctx.lineWidth = 2;
+   479→      const text = `+${dn.value} XP`;
+   480→      ctx.strokeText(text, screenX, screenY);
+   481→      ctx.fillText(text, screenX, screenY);
+   482→    }
+   483→    ctx.globalAlpha = 1;
+   484→  }
+   485→}
+   486→
+   487→// =============================================
+   488→// Spell effect rendering
+   489→// =============================================
+   490→function renderSpellEffects(
+   491→  ctx: CanvasRenderingContext2D,
+   492→  effects: SpellEffect[],
+   493→  camX: number,
+   494→  camY: number
+   495→) {
+   496→  const now = Date.now();
+   497→
+   498→  for (const ef of effects) {
+   499→    const elapsed = now - ef.startTime;
+   500→    const progress = Math.min(1, elapsed / ef.duration);
+   501→    const alpha = 1 - progress;
+   502→
+   503→    const sx = ef.position.x * TILE_SIZE + TILE_SIZE / 2 - camX;
+   504→    const sy = ef.position.y * TILE_SIZE + TILE_SIZE / 2 - camY;
+   505→
+   506→    switch (ef.type) {
+   507→      case 'sword_slash': {
+   508→        // Arc slash animation
+   509→        const dir = ef.direction ?? Direction.SOUTH;
+   510→        const baseAngle = dir === Direction.NORTH ? -Math.PI / 2 : dir === Direction.SOUTH ? Math.PI / 2 : dir === Direction.EAST ? 0 : Math.PI;
+   511→        const swingAngle = baseAngle - 0.8 + progress * 1.6;
+   512→        const radius = 18 + progress * 8;
+   513→
+   514→        ctx.save();
+   515→        ctx.globalAlpha = alpha;
+   516→        ctx.strokeStyle = ef.color;
+   517→        ctx.lineWidth = 3;
+   518→        ctx.shadowColor = ef.color;
+   519→        ctx.shadowBlur = 8;
+   520→        ctx.beginPath();
+   521→        ctx.arc(sx, sy, radius, swingAngle - 0.8, swingAngle + 0.2);
+   522→        ctx.stroke();
+   523→
+   524→        // Second trail
+   525→        ctx.globalAlpha = alpha * 0.5;
+   526→        ctx.lineWidth = 2;
+   527→        ctx.beginPath();
+   528→        ctx.arc(sx, sy, radius - 4, swingAngle - 0.6, swingAngle);
+   529→        ctx.stroke();
+   530→        ctx.restore();
+   531→        break;
+   532→      }
+   533→
+   534→      case 'projectile': {
+   535→        // Traveling projectile (fireball, energy beam)
+   536→        if (!ef.targetPosition || !ef.direction) break;
+   537→        const tx = ef.targetPosition.x * TILE_SIZE + TILE_SIZE / 2 - camX;
+   538→        const ty = ef.targetPosition.y * TILE_SIZE + TILE_SIZE / 2 - camY;
+   539→
+   540→        const projX = sx + (tx - sx) * progress;
+   541→        const projY = sy + (ty - sy) * progress;
+   542→
+   543→        ctx.save();
+   544→        ctx.globalAlpha = alpha;
+   545→
+   546→        // Trail
+   547→        const trailLen = 5;
+   548→        for (let i = 0; i < trailLen; i++) {
+   549→          const t = Math.max(0, progress - i * 0.08);
+   550→          const trailX = sx + (tx - sx) * t;
+   551→          const trailY = sy + (ty - sy) * t;
+   552→          ctx.globalAlpha = alpha * (1 - i / trailLen) * 0.4;
+   553→          ctx.fillStyle = ef.color;
+   554→          ctx.beginPath();
+   555→          ctx.arc(trailX, trailY, 6 - i, 0, Math.PI * 2);
+   556→          ctx.fill();
+   557→        }
+   558→
+   559→        // Main projectile
+   560→        ctx.globalAlpha = alpha;
+   561→        ctx.fillStyle = ef.color;
+   562→        ctx.shadowColor = ef.color;
+   563→        ctx.shadowBlur = 12;
+   564→        ctx.beginPath();
+   565→        ctx.arc(projX, projY, 7, 0, Math.PI * 2);
+   566→        ctx.fill();
+   567→
+   568→        // Bright center
+   569→        ctx.fillStyle = '#fff';
+   570→        ctx.globalAlpha = alpha * 0.8;
+   571→        ctx.beginPath();
+   572→        ctx.arc(projX, projY, 3, 0, Math.PI * 2);
+   573→        ctx.fill();
+   574→
+   575→        // Explosion on impact
+   576→        if (progress > 0.85) {
+   577→          const expProgress = (progress - 0.85) / 0.15;
+   578→          ctx.globalAlpha = (1 - expProgress) * 0.8;
+   579→          ctx.fillStyle = ef.color;
+   580→          ctx.shadowBlur = 20;
+   581→          ctx.beginPath();
+   582→          ctx.arc(tx, ty, 10 + expProgress * 20, 0, Math.PI * 2);
+   583→          ctx.fill();
+   584→        }
+   585→
+   586→        ctx.restore();
+   587→        break;
+   588→      }
+   589→
+   590→      case 'explosion': {
+   591→        if (!ef.targetPosition) break;
+   592→        const tx = ef.targetPosition.x * TILE_SIZE + TILE_SIZE / 2 - camX;
+   593→        const ty = ef.targetPosition.y * TILE_SIZE + TILE_SIZE / 2 - camY;
+   594→
+   595→        ctx.save();
+   596→        // Expanding ring
+   597→        const radius = 5 + progress * 25;
+   598→        ctx.globalAlpha = alpha * 0.6;
+   599→        ctx.strokeStyle = ef.color;
+   600→        ctx.lineWidth = 3;
+   601→        ctx.shadowColor = ef.color;
+   602→        ctx.shadowBlur = 10;
+   603→        ctx.beginPath();
+   604→        ctx.arc(tx, ty, radius, 0, Math.PI * 2);
+   605→        ctx.stroke();
+   606→
+   607→        // Inner flash
+   608→        ctx.globalAlpha = alpha * 0.4;
+   609→        ctx.fillStyle = '#fff';
+   610→        ctx.beginPath();
+   611→        ctx.arc(tx, ty, radius * 0.5, 0, Math.PI * 2);
+   612→        ctx.fill();
+   613→
+   614→        // Particles
+   615→        for (let i = 0; i < 8; i++) {
+   616→          const angle = (i / 8) * Math.PI * 2;
+   617→          const px = tx + Math.cos(angle) * radius * 1.2;
+   618→          const py = ty + Math.sin(angle) * radius * 1.2;
+   619→          ctx.globalAlpha = alpha * 0.7;
+   620→          ctx.fillStyle = ef.color;
+   621→          ctx.beginPath();
+   622→          ctx.arc(px, py, 3 * (1 - progress), 0, Math.PI * 2);
+   623→          ctx.fill();
+   624→        }
+   625→        ctx.restore();
+   626→        break;
+   627→      }
+   628→
+   629→      case 'heal_aura': {
+   630→        ctx.save();
+   631→        // Green rising particles
+   632→        for (let i = 0; i < 12; i++) {
+   633→          const angle = (i / 12) * Math.PI * 2 + progress * 0.5;
+   634→          const radius = 10 + progress * 15;
+   635→          const px = sx + Math.cos(angle) * radius;
+   636→          const py = sy + Math.sin(angle) * radius - progress * 20;
+   637→          ctx.globalAlpha = alpha * 0.7;
+   638→          ctx.fillStyle = ef.color;
+   639→          ctx.shadowColor = ef.color;
+   640→          ctx.shadowBlur = 6;
+   641→          ctx.beginPath();
+   642→          ctx.arc(px, py, 3, 0, Math.PI * 2);
+   643→          ctx.fill();
+   644→        }
+   645→
+   646→        // Cross healing symbol
+   647→        ctx.globalAlpha = alpha * 0.5;
+   648→        ctx.strokeStyle = '#2ecc71';
+   649→        ctx.lineWidth = 3;
+   650→        ctx.beginPath();
+   651→        ctx.moveTo(sx, sy - 8);
+   652→        ctx.lineTo(sx, sy + 8);
+   653→        ctx.moveTo(sx - 8, sy);
+   654→        ctx.lineTo(sx + 8, sy);
+   655→        ctx.stroke();
+   656→        ctx.restore();
+   657→        break;
+   658→      }
+   659→
+   660→      case 'whirlwind': {
+   661→        ctx.save();
+   662→        const spinAngle = progress * Math.PI * 4;
+   663→        const radius = 12 + progress * 20;
+   664→
+   665→        ctx.globalAlpha = alpha * 0.6;
+   666→        ctx.strokeStyle = ef.color;
+   667→        ctx.lineWidth = 3;
+   668→        ctx.shadowColor = ef.color;
+   669→        ctx.shadowBlur = 8;
+   670→
+   671→        // Spinning arcs
+   672→        for (let a = 0; a < 3; a++) {
+   673→          const arcStart = spinAngle + (a * Math.PI * 2) / 3;
+   674→          ctx.beginPath();
+   675→          ctx.arc(sx, sy, radius, arcStart, arcStart + Math.PI * 0.5);
+   676→          ctx.stroke();
+   677→        }
+   678→
+   679→        // Center flash
+   680→        ctx.globalAlpha = alpha * 0.3;
+   681→        ctx.fillStyle = ef.color;
+   682→        ctx.beginPath();
+   683→        ctx.arc(sx, sy, 8, 0, Math.PI * 2);
+   684→        ctx.fill();
+   685→        ctx.restore();
+   686→        break;
+   687→      }
+   688→
+   689→      case 'lightning': {
+   690→        if (!ef.targetPosition) break;
+   691→        const tx = ef.targetPosition.x * TILE_SIZE + TILE_SIZE / 2 - camX;
+   692→        const ty = ef.targetPosition.y * TILE_SIZE + TILE_SIZE / 2 - camY;
+   693→
+   694→        ctx.save();
+   695→        ctx.globalAlpha = alpha;
+   696→
+   697→        // Lightning bolt (jagged line)
+   698→        ctx.strokeStyle = '#f1c40f';
+   699→        ctx.lineWidth = 3;
+   700→        ctx.shadowColor = '#f1c40f';
+   701→        ctx.shadowBlur = 15;
+   702→
+   703→        const segments = 6;
+   704→        ctx.beginPath();
+   705→        ctx.moveTo(sx, sy - 20);
+   706→        for (let i = 1; i <= segments; i++) {
+   707→          const t = i / segments;
+   708→          const lx = sx + (tx - sx) * t + (Math.random() - 0.5) * 15 * (1 - Math.abs(t - 0.5) * 2);
+   709→          const ly = sy + (ty - sy) * t + (Math.random() - 0.5) * 15 * (1 - Math.abs(t - 0.5) * 2);
+   710→          ctx.lineTo(lx, ly);
+   711→        }
+   712→        ctx.stroke();
+   713→
+   714→        // Bright core
+   715→        ctx.strokeStyle = '#fff';
+   716→        ctx.lineWidth = 1;
+   717→        ctx.stroke();
+   718→
+   719→        // Impact flash
+   720→        if (progress > 0.5) {
+   721→          const flashP = (progress - 0.5) / 0.5;
+   722→          ctx.globalAlpha = (1 - flashP) * 0.8;
+   723→          ctx.fillStyle = '#f1c40f';
+   724→          ctx.shadowBlur = 25;
+   725→          ctx.beginPath();
+   726→          ctx.arc(tx, ty, 15 + flashP * 10, 0, Math.PI * 2);
+   727→          ctx.fill();
+   728→        }
+   729→        ctx.restore();
+   730→        break;
+   731→      }
+   732→
+   733→      case 'earthquake': {
+   734→        ctx.save();
+   735→        const radius = 10 + progress * 40;
+   736→        ctx.globalAlpha = alpha * 0.5;
+   737→
+   738→        // Shockwave rings
+   739→        for (let r = 0; r < 3; r++) {
+   740→          const ringRadius = radius * (0.5 + r * 0.3);
+   741→          ctx.strokeStyle = ef.color;
+   742→          ctx.lineWidth = 2;
+   743→          ctx.beginPath();
+   744→          ctx.arc(sx, sy, ringRadius, 0, Math.PI * 2);
+   745→          ctx.stroke();
+   746→        }
+   747→
+   748→        // Ground cracks (lines radiating out)
+   749→        ctx.globalAlpha = alpha * 0.4;
+   750→        ctx.strokeStyle = '#654321';
+   751→        ctx.lineWidth = 2;
+   752→        for (let i = 0; i < 8; i++) {
+   753→          const angle = (i / 8) * Math.PI * 2;
+   754→          const len = radius * (0.5 + Math.random() * 0.5);
+   755→          ctx.beginPath();
+   756→          ctx.moveTo(sx, sy);
+   757→          ctx.lineTo(sx + Math.cos(angle) * len, sy + Math.sin(angle) * len);
+   758→          ctx.stroke();
+   759→        }
+   760→        ctx.restore();
+   761→        break;
+   762→      }
+   763→
+   764→      case 'war_cry': {
+   765→        ctx.save();
+   766→        const radius = 10 + progress * 30;
+   767→
+   768→        // Expanding sound wave rings
+   769→        for (let i = 0; i < 3; i++) {
+   770→          const ringR = radius * (0.6 + i * 0.2);
+   771→          ctx.globalAlpha = alpha * (0.4 - i * 0.1);
+   772→          ctx.strokeStyle = ef.color;
+   773→          ctx.lineWidth = 2;
+   774→          ctx.beginPath();
+   775→          ctx.arc(sx, sy, ringR, 0, Math.PI * 2);
+   776→          ctx.stroke();
+   777→        }
+   778→
+   779→        // "POW" text effect
+   780→        ctx.globalAlpha = alpha;
+   781→        ctx.fillStyle = ef.color;
+   782→        ctx.font = `bold ${14 + progress * 6}px sans-serif`;
+   783→        ctx.textAlign = 'center';
+   784→        ctx.textBaseline = 'middle';
+   785→        ctx.shadowColor = ef.color;
+   786→        ctx.shadowBlur = 10;
+   787→        ctx.fillText('ATK UP!', sx, sy - 20 - progress * 10);
+   788→        ctx.restore();
+   789→        break;
+   790→      }
+   791→    }
+   792→  }
+   793→}
+   794→
+   795→// =============================================
+   796→// Level up celebration rendering
+   797→// =============================================
+   798→function renderLevelUpCelebration(
+   799→  ctx: CanvasRenderingContext2D,
+   800→  canvasWidth: number,
+   801→  canvasHeight: number,
+   802→  levelUpTime: number
+   803→) {
+   804→  const elapsed = Date.now() - levelUpTime;
+   805→  if (elapsed > 2500) return;
+   806→
+   807→  const progress = elapsed / 2500;
+   808→  const alpha = progress < 0.2 ? progress / 0.2 : progress > 0.7 ? (1 - progress) / 0.3 : 1;
+   809→
+   810→  ctx.save();
+   811→  ctx.globalAlpha = alpha;
+   812→
+   813→  // Golden radial burst
+   814→  const cx = canvasWidth / 2;
+   815→  const cy = canvasHeight / 2 - 40;
+   816→  const burstRadius = 80 + progress * 60;
+   817→
+   818→  for (let i = 0; i < 12; i++) {
+   819→    const angle = (i / 12) * Math.PI * 2 + progress * 2;
+   820→    const rayLen = burstRadius * (0.6 + Math.sin(progress * 10 + i) * 0.4);
+   821→    ctx.strokeStyle = `hsl(${45 + i * 3}, 100%, ${60 + progress * 20}%)`;
+   822→    ctx.lineWidth = 3 - progress * 2;
+   823→    ctx.beginPath();
+   824→    ctx.moveTo(cx, cy);
+   825→    ctx.lineTo(cx + Math.cos(angle) * rayLen, cy + Math.sin(angle) * rayLen);
+   826→    ctx.stroke();
+   827→  }
+   828→
+   829→  // Rising golden particles
+   830→  for (let i = 0; i < 20; i++) {
+   831→    const angle = (i / 20) * Math.PI * 2;
+   832→    const r = 30 + progress * 80;
+   833→    const px = cx + Math.cos(angle + progress * 3) * r;
+   834→    const py = cy + Math.sin(angle + progress * 3) * r - progress * 60;
+   835→    const size = 3 * (1 - progress);
+   836→    ctx.fillStyle = `hsl(${40 + i * 5}, 100%, 70%)`;
+   837→    ctx.globalAlpha = alpha * (1 - progress) * 0.8;
+   838→    ctx.beginPath();
+   839→    ctx.arc(px, py, size, 0, Math.PI * 2);
+   840→    ctx.fill();
+   841→  }
+   842→
+   843→  // "LEVEL UP!" text
+   844→  ctx.globalAlpha = alpha;
+   845→  ctx.font = `bold ${28 + Math.sin(progress * 8) * 4}px sans-serif`;
+   846→  ctx.textAlign = 'center';
+   847→  ctx.textBaseline = 'middle';
+   848→  ctx.shadowColor = '#f1c40f';
+   849→  ctx.shadowBlur = 20;
+   850→  ctx.strokeStyle = '#8B6914';
+   851→  ctx.lineWidth = 4;
+   852→  ctx.strokeText('⭐ LEVEL UP! ⭐', cx, cy);
+   853→  ctx.fillStyle = '#f1c40f';
+   854→  ctx.fillText('⭐ LEVEL UP! ⭐', cx, cy);
+   855→  ctx.shadowBlur = 0;
+   856→
+   857→  ctx.restore();
+   858→}
+   859→
+   860→// =============================================
+   861→// Target reticle rendering
+   862→// =============================================
+   863→function renderTargetReticle(
+   864→  ctx: CanvasRenderingContext2D,
+   865→  playerX: number,
+   866→  playerY: number,
+   867→  direction: Direction,
+   868→  monsters: { id: string; position: { x: number; y: number }; isDead: boolean; definitionId: string }[],
+   869→  camX: number,
+   870→  camY: number
+   871→) {
+   872→  const dirOff = DIR_OFFSETS[direction];
+   873→
+   874→  // Check monsters in front
+   875→  for (const m of monsters) {
+   876→    if (m.isDead) continue;
+   877→    const dx = m.position.x - playerX;
+   878→    const dy = m.position.y - playerY;
+   879→    const dist = Math.max(Math.abs(dx), Math.abs(dy));
+   880→
+   881→    if (dist > 5) continue; // only show reticle for nearby monsters
+   882→
+   883→    // Check if monster is in the direction player faces (with some tolerance)
+   884→    const dotProduct = dx * dirOff.x + dy * dirOff.y;
+   885→    if (dotProduct <= 0 && dist > 1) continue; // allow adjacent regardless of direction
+   886→
+   887→    const mx = m.position.x * TILE_SIZE + TILE_SIZE / 2 - camX;
+   888→    const my = m.position.y * TILE_SIZE + TILE_SIZE / 2 - camY;
+   889→
+   890→    // Pulsing red targeting reticle
+   891→    const time = Date.now() / 300;
+   892→    const pulse = 0.6 + Math.sin(time) * 0.3;
+   893→
+   894→    ctx.save();
+   895→    ctx.strokeStyle = `rgba(255, 50, 50, ${pulse})`;
+   896→    ctx.lineWidth = 1.5;
+   897→    ctx.setLineDash([4, 3]);
+   898→
+   899→    // Corner brackets
+   900→    const s = 18;
+   901→    const c = 5;
+   902→    // Top-left
+   903→    ctx.beginPath();
+   904→    ctx.moveTo(mx - s, my - s + c); ctx.lineTo(mx - s, my - s); ctx.lineTo(mx - s + c, my - s);
+   905→    ctx.stroke();
+   906→    // Top-right
+   907→    ctx.beginPath();
+   908→    ctx.moveTo(mx + s - c, my - s); ctx.lineTo(mx + s, my - s); ctx.lineTo(mx + s, my - s + c);
+   909→    ctx.stroke();
+   910→    // Bottom-left
+   911→    ctx.beginPath();
+   912→    ctx.moveTo(mx - s, my + s - c); ctx.lineTo(mx - s, my + s); ctx.lineTo(mx - s + c, my + s);
+   913→    ctx.stroke();
+   914→    // Bottom-right
+   915→    ctx.beginPath();
+   916→    ctx.moveTo(mx + s - c, my + s); ctx.lineTo(mx + s, my + s); ctx.lineTo(mx + s, my + s - c);
+   917→    ctx.stroke();
+   918→
+   919→    ctx.setLineDash([]);
+   920→
+   921→    // Highlight the closest one
+   922→    if (dist <= 1) {
+   923→      ctx.strokeStyle = `rgba(255, 80, 80, ${pulse * 0.4})`;
+   924→      ctx.lineWidth = 2;
+   925→      ctx.strokeRect(mx - s - 2, my - s - 2, (s + 2) * 2, (s + 2) * 2);
+   926→    }
+   927→
+   928→    ctx.restore();
+   929→    break; // only show reticle on one monster (closest in direction)
+   930→  }
+   931→}
+   932→
+   933→// =============================================
+   934→// Main Game Canvas Component
+   935→// =============================================
+   936→export default function GameCanvas() {
+   937→  const canvasRef = useRef<HTMLCanvasElement>(null);
+   938→  const lastMoveTime = useRef(0);
+   939→  const keysPressed = useRef<Set<string>>(new Set());
+   940→  const lastFrameTime = useRef(0);
+   941→  const animFrameRef = useRef<number>(0);
+   942→
+   943→  const player = useGameStore((s) => s.player);
+   944→  const gameMap = useGameStore((s) => s.gameMap);
+   945→  const monsters = useGameStore((s) => s.monsters);
+   946→  const otherPlayers = useGameStore((s) => s.otherPlayers);
+   947→  const damageNumbers = useGameStore((s) => s.damageNumbers);
+   948→  const movePlayer = useGameStore((s) => s.movePlayer);
+   949→  const attackMonster = useGameStore((s) => s.attackMonster);
+   950→  const interactNPC = useGameStore((s) => s.interactNPC);
+   951→  const updateMonsters = useGameStore((s) => s.updateMonsters);
+   952→  const cleanupDamageNumbers = useGameStore((s) => s.cleanupDamageNumbers);
+   953→  const cleanupSpellEffects = useGameStore((s) => s.cleanupSpellEffects);
+   954→  const regenMana = useGameStore((s) => s.regenMana);
+   955→
+   956→  const moveDelay = player ? 300 / player.stats.speed : 300;
+   957→
+   958→  // Render function - uses refs to avoid closure issues
+   959→  const doRender = useCallback(() => {
+   960→    const canvas = canvasRef.current;
+   961→    if (!canvas) return;
+   962→    const ctx = canvas.getContext('2d');
+   963→    const currentPlayer = useGameStore.getState().player;
+   964→    const currentMap = useGameStore.getState().gameMap;
+   965→    const currentMonsters = useGameStore.getState().monsters;
+   966→    const currentOthers = useGameStore.getState().otherPlayers;
+   967→    const currentDmgNumbers = useGameStore.getState().damageNumbers;
+   968→    const currentSpellEffects = useGameStore.getState().spellEffects;
+   969→    const currentBuffEnd = useGameStore.getState().buffEndTime;
+   970→    const screenShakeTime = useGameStore.getState().screenShakeTime;
+   971→    const levelUpTime = useGameStore.getState().levelUpTime;
+   972→    if (!ctx || !currentPlayer) return;
+   973→
+   974→    const canvasWidth = canvas.width;
+   975→    const canvasHeight = canvas.height;
+   976→
+   977→    // Screen shake offset
+   978→    let shakeX = 0;
+   979→    let shakeY = 0;
+   980→    const shakeElapsed = Date.now() - screenShakeTime;
+   981→    if (shakeElapsed < 300) {
+   982→      const intensity = (1 - shakeElapsed / 300) * 6;
+   983→      shakeX = (Math.random() - 0.5) * intensity * 2;
+   984→      shakeY = (Math.random() - 0.5) * intensity * 2;
+   985→    }
+   986→
+   987→    const camX = currentPlayer.position.x * TILE_SIZE - canvasWidth / 2 + TILE_SIZE / 2 + shakeX;
+   988→    const camY = currentPlayer.position.y * TILE_SIZE - canvasHeight / 2 + TILE_SIZE / 2 + shakeY;
+   989→
+   990→    ctx.fillStyle = '#1a1a2e';
+   991→    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+   992→
+   993→    const startTileX = Math.max(0, Math.floor(camX / TILE_SIZE) - 1);
+   994→    const startTileY = Math.max(0, Math.floor(camY / TILE_SIZE) - 1);
+   995→    const endTileX = Math.min(currentMap.tiles[0].length, Math.ceil((camX + canvasWidth) / TILE_SIZE) + 1);
+   996→    const endTileY = Math.min(currentMap.tiles.length, Math.ceil((camY + canvasHeight) / TILE_SIZE) + 1);
+   997→
+   998→    for (let y = startTileY; y < endTileY; y++) {
+   999→      for (let x = startTileX; x < endTileX; x++) {
+  1000→        const tile = currentMap.tiles[y][x];
+  1001→        const screenX = x * TILE_SIZE - camX;
+  1002→        const screenY = y * TILE_SIZE - camY;
+  1003→
+  1004→        ctx.fillStyle = TILE_COLORS[tile] || '#333';
+  1005→        ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+  1006→        drawTileDetail(ctx, tile, screenX, screenY);
+  1007→      }
+  1008→    }
+  1009→
+  1010→    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+  1011→    ctx.lineWidth = 0.5;
+  1012→    for (let y = startTileY; y < endTileY; y++) {
+  1013→      for (let x = startTileX; x < endTileX; x++) {
+  1014→        const screenX = x * TILE_SIZE - camX;
+  1015→        const screenY = y * TILE_SIZE - camY;
+  1016→        ctx.strokeRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+  1017→      }
+  1018→    }
+  1019→
+  1020→    for (const npc of currentMap.npcs) {
+  1021→      const screenX = npc.position.x * TILE_SIZE - camX;
+  1022→      const screenY = npc.position.y * TILE_SIZE - camY;
+  1023→      if (screenX > -TILE_SIZE && screenX < canvasWidth && screenY > -TILE_SIZE && screenY < canvasHeight) {
+  1024→        drawNPC(ctx, npc.name, npc.color, npc.icon, screenX, screenY);
+  1025→      }
+  1026→    }
+  1027→
+  1028→    for (const monster of currentMonsters) {
+  1029→      const def = MONSTERS[monster.definitionId];
+  1030→      if (!def) continue;
+  1031→
+  1032→      // Death fade animation
+  1033→      if (monster.isDead) {
+  1034→        if (!monster.deathTime) continue;
+  1035→        const deathAge = Date.now() - monster.deathTime;
+  1036→        if (deathAge > 1500) continue; // fully faded
+  1037→
+  1038→        const screenX = monster.position.x * TILE_SIZE - camX;
+  1039→        const screenY = monster.position.y * TILE_SIZE - camY;
+  1040→        if (screenX > -TILE_SIZE && screenX < canvasWidth && screenY > -TILE_SIZE && screenY < canvasHeight) {
+  1041→          const fadeAlpha = 1 - deathAge / 1500;
+  1042→          const shrinkScale = 1 - (deathAge / 1500) * 0.5;
+  1043→          ctx.save();
+  1044→          ctx.globalAlpha = fadeAlpha;
+  1045→          ctx.translate(screenX + TILE_SIZE / 2, screenY + TILE_SIZE / 2);
+  1046→          ctx.scale(shrinkScale, shrinkScale);
+  1047→          ctx.translate(-(screenX + TILE_SIZE / 2), -(screenY + TILE_SIZE / 2));
+  1048→
+  1049→          // Red-tinted death sprite
+  1050→          const ts = TILE_SIZE;
+  1051→          const cx = screenX + ts / 2;
+  1052→          const cy = screenY + ts / 2;
+  1053→          ctx.fillStyle = '#666';
+  1054→          ctx.beginPath();
+  1055→          ctx.roundRect(cx - 10, cy - 6, 20, 18, 4);
+  1056→          ctx.fill();
+  1057→          // X eyes
+  1058→          ctx.strokeStyle = '#999';
+  1059→          ctx.lineWidth = 2;
+  1060→          ctx.beginPath();
+  1061→          ctx.moveTo(cx - 6, cy - 2); ctx.lineTo(cx - 2, cy + 2);
+  1062→          ctx.moveTo(cx - 2, cy - 2); ctx.lineTo(cx - 6, cy + 2);
+  1063→          ctx.moveTo(cx + 2, cy - 2); ctx.lineTo(cx + 6, cy + 2);
+  1064→          ctx.moveTo(cx + 6, cy - 2); ctx.lineTo(cx + 2, cy + 2);
+  1065→          ctx.stroke();
+  1066→
+  1067→          ctx.restore();
+  1068→        }
+  1069→        continue;
+  1070→      }
+  1071→
+  1072→      const screenX = monster.position.x * TILE_SIZE - camX;
+  1073→      const screenY = monster.position.y * TILE_SIZE - camY;
+  1074→      if (screenX > -TILE_SIZE && screenX < canvasWidth && screenY > -TILE_SIZE && screenY < canvasHeight) {
+  1075→        drawMonster(ctx, def.name, def.color, def.icon, screenX, screenY, monster.health, monster.maxHealth, def.sprites, monster.direction as Direction);
+  1076→      }
+  1077→    }
+  1078→
+  1079→    for (const other of currentOthers) {
+  1080→      const screenX = other.position.x * TILE_SIZE - camX;
+  1081→      const screenY = other.position.y * TILE_SIZE - camY;
+  1082→      if (screenX > -TILE_SIZE && screenX < canvasWidth && screenY > -TILE_SIZE && screenY < canvasHeight) {
+  1083→        drawPlayerSprite(ctx, other.name, screenX, screenY, other.direction as Direction, '#3498db', other.level, other.health, other.maxHealth, false);
+  1084→      }
+  1085→    }
+  1086→
+  1087→    const playerScreenX = currentPlayer.position.x * TILE_SIZE - camX;
+  1088→    const playerScreenY = currentPlayer.position.y * TILE_SIZE - camY;
+  1089→    const hasBuff = Date.now() < currentBuffEnd;
+  1090→    drawPlayerSprite(ctx, currentPlayer.name, playerScreenX, playerScreenY, currentPlayer.direction, '#e67e22', currentPlayer.stats.level, currentPlayer.stats.health, currentPlayer.stats.maxHealth, hasBuff);
+  1091→
+  1092→    // Render spell effects
+  1093→    renderSpellEffects(ctx, currentSpellEffects, camX, camY);
+  1094→
+  1095→    renderDamageNumbers(ctx, currentDmgNumbers, camX, camY);
+  1096→
+  1097→    // Target reticle on monster in front of player
+  1098→    renderTargetReticle(ctx, currentPlayer.position.x, currentPlayer.position.y, currentPlayer.direction, currentMonsters, camX, camY);
+  1099→
+  1100→    // Day/Night cycle overlay
+  1101→    const gameMinutes = Date.now() / 100;
+  1102→    const totalGameHours = (gameMinutes / 60) % 24;
+  1103→    let nightAlpha = 0;
+  1104→    if (totalGameHours >= 21 || totalGameHours < 6) {
+  1105→      nightAlpha = 0.35;
+  1106→    } else if (totalGameHours >= 18) {
+  1107→      nightAlpha = 0.15 + (totalGameHours - 18) / 3 * 0.2;
+  1108→    } else if (totalGameHours < 8) {
+  1109→      nightAlpha = 0.35 - (totalGameHours - 6) / 2 * 0.35;
+  1110→    }
+  1111→    if (nightAlpha > 0) {
+  1112→      ctx.fillStyle = `rgba(10, 10, 40, ${nightAlpha})`;
+  1113→      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+  1114→    }
+  1115→
+  1116→    // Area name indicator
+  1117→    const px = currentPlayer.position.x;
+  1118→    const py = currentPlayer.position.y;
+  1119→    let areaName = '';
+  1120→    let areaColor = '#fff';
+  1121→    if (px >= 34 && px <= 66 && py >= 34 && py <= 61) { areaName = 'Tibia Town (Safe Zone)'; areaColor = '#f1c40f'; }
+  1122→    else if (px >= 5 && px <= 95 && py >= 2 && py <= 30) { areaName = 'Northern Forest'; areaColor = '#2ecc71'; }
+  1123→    else if (px >= 5 && px <= 95 && py >= 65 && py <= 98) { areaName = 'Southern Swamp'; areaColor = '#27ae60'; }
+  1124→    else if (px >= 2 && px <= 32 && py >= 5 && py <= 63) { areaName = 'Western Desert'; areaColor = '#e67e22'; }
+  1125→    else if (px >= 70 && px <= 98 && py >= 5 && py <= 63) { areaName = 'Eastern Mountains'; areaColor = '#95a5a6'; }
+  1126→    else if (px >= 2 && px <= 12 && py >= 88 && py <= 98) { areaName = 'Lava Fields (BOSS)'; areaColor = '#e74c3c'; }
+  1127→    else if (px >= 88 && px <= 98 && py >= 88 && py <= 98) { areaName = 'Dark Forest (LEGEND)'; areaColor = '#c0392b'; }
+  1128→
+  1129→    if (areaName) {
+  1130→      ctx.font = 'bold 12px sans-serif';
+  1131→      ctx.textAlign = 'center';
+  1132→      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  1133→      ctx.fillText(areaName, canvasWidth / 2 + 1, 21);
+  1134→      ctx.fillStyle = areaColor;
+  1135→      ctx.fillText(areaName, canvasWidth / 2, 20);
+  1136→    }
+  1137→
+  1138→    // Safe zone indicator
+  1139→    const inTown = currentPlayer.position.x >= 35 && currentPlayer.position.x < 65 && currentPlayer.position.y >= 35 && currentPlayer.position.y < 60;
+  1140→    if (inTown) {
+  1141→      ctx.font = 'bold 11px sans-serif';
+  1142→      ctx.textAlign = 'center';
+  1143→      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  1144→      ctx.fillText('🛡️ SAFE', canvasWidth / 2 + 1, 36);
+  1145→      ctx.fillStyle = '#2ecc71';
+  1146→      ctx.fillText('🛡️ SAFE', canvasWidth / 2, 35);
+  1147→    }
+  1148→
+  1149→    // Level up celebration
+  1150→    if (levelUpTime > 0) {
+  1151→      renderLevelUpCelebration(ctx, canvasWidth, canvasHeight, levelUpTime);
+  1152→    }
+  1153→  }, []);
+  1154→
+  1155→  // Game loop ref to avoid self-reference
+  1156→  const gameLoopRef = useRef<(timestamp: number) => void>();
+  1157→
+  1158→  // Game loop
+  1159→  const gameLoop = useCallback(
+  1160→    (timestamp: number) => {
+  1161→      const deltaTime = lastFrameTime.current ? timestamp - lastFrameTime.current : 16;
+  1162→      lastFrameTime.current = timestamp;
+  1163→
+  1164→      const store = useGameStore.getState();
+  1165→      const now = Date.now();
+  1166→      const delay = store.player ? 300 / store.player.stats.speed : 300;
+  1167→
+  1168→      if (now - lastMoveTime.current > delay) {
+  1169→        let moved = false;
+  1170→        if (keysPressed.current.has('w') || keysPressed.current.has('arrowup')) {
+  1171→          store.movePlayer(Direction.NORTH); moved = true;
+  1172→        } else if (keysPressed.current.has('s') || keysPressed.current.has('arrowdown')) {
+  1173→          store.movePlayer(Direction.SOUTH); moved = true;
+  1174→        } else if (keysPressed.current.has('a') || keysPressed.current.has('arrowleft')) {
+  1175→          store.movePlayer(Direction.WEST); moved = true;
+  1176→        } else if (keysPressed.current.has('d') || keysPressed.current.has('arrowright')) {
+  1177→          store.movePlayer(Direction.EAST); moved = true;
+  1178→        }
+  1179→        if (moved) lastMoveTime.current = now;
+  1180→      }
+  1181→
+  1182→      store.updateMonsters(deltaTime);
+  1183→      store.regenMana(deltaTime);
+  1184→
+  1185→      // Auto-attack when holding Space
+  1186→      if (keysPressed.current.has(' ')) {
+  1187→        const autoAttackDelay = 500; // ms between auto-attacks
+  1188→        const now = Date.now();
+  1189→        if (now - store.lastAutoAttackTime > autoAttackDelay) {
+  1190→          store.attackMonster();
+  1191→          useGameStore.setState({ lastAutoAttackTime: now });
+  1192→        }
+  1193→      }
+  1194→
+  1195→      if (now % 500 < 20) {
+  1196→        store.cleanupDamageNumbers();
+  1197→        store.cleanupSpellEffects();
+  1198→      }
+  1199→
+  1200→      doRender();
+  1201→      animFrameRef.current = requestAnimationFrame(gameLoopRef.current!);
+  1202→    },
+  1203→    [doRender]
+  1204→  );
+  1205→
+  1206→  gameLoopRef.current = gameLoop; // eslint-disable-line react-hooks/refs -- sync ref for recursive rAF
+  1207→
+  1208→  // Handle keyboard
+  1209→  useEffect(() => {
+  1210→    const handleKeyDown = (e: KeyboardEvent) => {
+  1211→      const key = e.key.toLowerCase();
+  1212→      keysPressed.current.add(key);
+  1213→
+  1214→      // Space = physical attack with sword (also auto-attacks when held)
+  1215→      if (key === ' ') {
+  1216→        e.preventDefault();
+  1217→        const s = useGameStore.getState();
+  1218→        const now = Date.now();
+  1219→        if (now - s.lastAutoAttackTime > 500) {
+  1220→          s.attackMonster();
+  1221→          useGameStore.setState({ lastAutoAttackTime: now });
+  1222→        }
+  1223→      }
+  1224→      // E = interact with NPC
+  1225→      if (key === 'e') {
+  1226→        useGameStore.getState().interactNPC();
+  1227→      }
+  1228→
+  1229→      // I, O, P = cast skills (Mac-friendly keys)
+  1230→      if (key === 'i') { e.preventDefault(); if (!useGameStore.getState().showSkillPanel) useGameStore.getState().castSkill(0); }
+  1231→      if (key === 'o') { e.preventDefault(); if (!useGameStore.getState().showSkillPanel) useGameStore.getState().castSkill(1); }
+  1232→      if (key === 'p') { e.preventDefault(); if (!useGameStore.getState().showSkillPanel) useGameStore.getState().castSkill(2); }
+  1233→      if (key === 'k') { e.preventDefault(); useGameStore.getState().toggleSkillPanel(); }
+  1234→      if (e.key === 'Escape') { e.preventDefault(); if (useGameStore.getState().showSkillPanel) useGameStore.getState().toggleSkillPanel(); }
+  1235→
+  1236→      // Q1/Q2 = quick potions
+  1237→      if (key === 'q') {
+  1238→        e.preventDefault();
+  1239→        const s = useGameStore.getState();
+  1240→        if (s.player) {
+  1241→          // Use HP potion first if hurt, otherwise MP
+  1242→          const needHP = s.player.stats.health < s.player.stats.maxHealth * 0.8;
+  1243→          const potions = s.player.inventory.filter(i =>
+  1244→            needHP ? i.itemId.startsWith('health_potion') : i.itemId.startsWith('mana_potion')
+  1245→          ).sort((a, b) => {
+  1246→            const order = needHP
+  1247→              ? ['health_potion_large', 'health_potion_medium', 'health_potion_small']
+  1248→              : ['mana_potion_large', 'mana_potion_medium', 'mana_potion_small'];
+  1249→            return order.indexOf(a.itemId) - order.indexOf(b.itemId);
+  1250→          });
+  1251→          if (potions.length > 0) s.consumeInventoryItem(potions[0].id);
+  1252→        }
+  1253→      }
+  1254→
+  1255→      // 1-9 = use inventory items
+  1256→      const num = parseInt(key);
+  1257→      if (num >= 1 && num <= 9) {
+  1258→        const store = useGameStore.getState();
+  1259→        if (store.player) {
+  1260→          const invItem = store.player.inventory[num - 1];
+  1261→          if (invItem) {
+  1262→            store.consumeInventoryItem(invItem.id);
+  1263→          }
+  1264→        }
+  1265→      }
+  1266→    };
+  1267→
+  1268→    const handleKeyUp = (e: KeyboardEvent) => {
+  1269→      keysPressed.current.delete(e.key.toLowerCase());
+  1270→    };
+  1271→
+  1272→    window.addEventListener('keydown', handleKeyDown);
+  1273→    window.addEventListener('keyup', handleKeyUp);
+  1274→
+  1275→    return () => {
+  1276→      window.removeEventListener('keydown', handleKeyDown);
+  1277→      window.removeEventListener('keyup', handleKeyUp);
+  1278→      keysPressed.current.clear();
+  1279→    };
+  1280→  }, []);
+  1281→
+  1282→  // Handle canvas click
+  1283→  const handleCanvasClick = useCallback(
+  1284→    (e: React.MouseEvent<HTMLCanvasElement>) => {
+  1285→      const canvas = canvasRef.current;
+  1286→      const currentPlayer = useGameStore.getState().player;
+  1287→      if (!canvas || !currentPlayer) return;
+  1288→
+  1289→      const rect = canvas.getBoundingClientRect();
+  1290→      const scaleX = canvas.width / rect.width;
+  1291→      const scaleY = canvas.height / rect.height;
+  1292→      const clickX = (e.clientX - rect.left) * scaleX;
+  1293→      const clickY = (e.clientY - rect.top) * scaleY;
+  1294→
+  1295→      const camX = currentPlayer.position.x * TILE_SIZE - canvas.width / 2 + TILE_SIZE / 2;
+  1296→      const camY = currentPlayer.position.y * TILE_SIZE - canvas.height / 2 + TILE_SIZE / 2;
+  1297→
+  1298→      const tileX = Math.floor((clickX + camX) / TILE_SIZE);
+  1299→      const tileY = Math.floor((clickY + camY) / TILE_SIZE);
+  1300→
+  1301→      const dx = tileX - currentPlayer.position.x;
+  1302→      const dy = tileY - currentPlayer.position.y;
+  1303→      const dist = Math.abs(dx) + Math.abs(dy);
+  1304→
+  1305→      const store = useGameStore.getState();
+  1306→      const targetMonster = store.monsters.find(
+  1307→        (m) => !m.isDead && m.position.x === tileX && m.position.y === tileY
+  1308→      );
+  1309→      const targetNPC = store.gameMap.npcs.find(
+  1310→        (n) => Math.abs(n.position.x - tileX) <= 1 && Math.abs(n.position.y - tileY) <= 1
+  1311→      );
+  1312→
+  1313→      if (targetMonster && dist <= 2) {
+  1314→        const dir = getDirection(dx, dy);
+  1315→        store.movePlayer(dir);
+  1316→        setTimeout(() => store.attackMonster(), 50);
+  1317→      } else if (targetNPC && dist <= 3) {
+  1318→        const dir = getDirection(
+  1319→          targetNPC.position.x - currentPlayer.position.x,
+  1320→          targetNPC.position.y - currentPlayer.position.y
+  1321→        );
+  1322→        store.movePlayer(dir);
+  1323→        setTimeout(() => store.interactNPC(), 50);
+  1324→      }
+  1325→    },
+  1326→    []
+  1327→  );
+  1328→
+  1329→  // Preload monster sprites
+  1330→  useEffect(() => {
+  1331→    preloadSprites();
+  1332→  }, []);
+  1333→
+  1334→  // Canvas resize
+  1335→  useEffect(() => {
+  1336→    const resizeCanvas = () => {
+  1337→      const canvas = canvasRef.current;
+  1338→      if (!canvas) return;
+  1339→      const container = canvas.parentElement;
+  1340→      if (!container) return;
+  1341→
+  1342→      const width = container.clientWidth;
+  1343→      const height = container.clientHeight;
+  1344→      canvas.width = width;
+  1345→      canvas.height = height;
+  1346→      canvas.style.width = `${width}px`;
+  1347→      canvas.style.height = `${height}px`;
+  1348→    };
+  1349→
+  1350→    resizeCanvas();
+  1351→    window.addEventListener('resize', resizeCanvas);
+  1352→    return () => window.removeEventListener('resize', resizeCanvas);
+  1353→  }, []);
+  1354→
+  1355→  // Start game loop
+  1356→  useEffect(() => {
+  1357→    if (player) {
+  1358→      lastFrameTime.current = 0;
+  1359→      animFrameRef.current = requestAnimationFrame(gameLoop);
+  1360→    }
+  1361→    return () => {
+  1362→      if (animFrameRef.current) {
+  1363→        cancelAnimationFrame(animFrameRef.current);
+  1364→      }
+  1365→    };
+  1366→  }, [player, gameLoop]);
+  1367→
+  1368→  // Spawn monsters on mount
+  1369→  useEffect(() => {
+  1370→    const store = useGameStore.getState();
+  1371→    if (store.monsters.length === 0) {
+  1372→      store.spawnMonsters();
+  1373→    }
+  1374→  }, []);
+  1375→
+  1376→  return (
+  1377→    <canvas
+  1378→      ref={canvasRef}
+  1379→      onClick={handleCanvasClick}
+  1380→      className="w-full h-full cursor-crosshair"
+  1381→      style={{ imageRendering: 'pixelated' }}
+  1382→    />
+  1383→  );
+  1384→}

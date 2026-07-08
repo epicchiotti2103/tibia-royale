@@ -310,7 +310,8 @@ function drawMonster(
   health: number,
   maxHealth: number,
   sprites?: MonsterSpriteSet,
-  direction?: Direction
+  direction?: Direction,
+  lastHitTime?: number
 ) {
   const ts = TILE_SIZE;
   const cx = x + ts / 2;
@@ -339,6 +340,25 @@ function drawMonster(
   } else {
     // No sprites — draw classic colored monster
     drawMonsterFallback(ctx, cx, cy, color);
+  }
+
+  // Hit flash overlay
+  if (lastHitTime) {
+    const flashElapsed = Date.now() - lastHitTime;
+    if (flashElapsed < 150) {
+      const flashAlpha = 0.6 * (1 - flashElapsed / 150);
+      ctx.globalAlpha = flashAlpha;
+      ctx.fillStyle = '#ffffff';
+      if (sprites && direction !== undefined) {
+        const spriteSize = ts + 4;
+        ctx.fillRect(cx - spriteSize / 2, cy - spriteSize / 2 - 2, spriteSize, spriteSize);
+      } else {
+        ctx.beginPath();
+        ctx.roundRect(cx - 10, cy - 6, 20, 18, 4);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1.0;
+    }
   }
 
   // Name
@@ -799,7 +819,9 @@ function renderLevelUpCelebration(
   ctx: CanvasRenderingContext2D,
   canvasWidth: number,
   canvasHeight: number,
-  levelUpTime: number
+  levelUpTime: number,
+  playerScreenX: number,
+  playerScreenY: number
 ) {
   const elapsed = Date.now() - levelUpTime;
   if (elapsed > 2500) return;
@@ -808,6 +830,43 @@ function renderLevelUpCelebration(
   const alpha = progress < 0.2 ? progress / 0.2 : progress > 0.7 ? (1 - progress) / 0.3 : 1;
 
   ctx.save();
+
+  // === In-world effects centered on the player ===
+  const pcx = playerScreenX + TILE_SIZE / 2;
+  const pcy = playerScreenY + TILE_SIZE / 2;
+
+  // Expanding golden ring (0 to 60px over 2 seconds, fading out)
+  if (elapsed < 2000) {
+    const ringProgress = elapsed / 2000;
+    const ringRadius = ringProgress * 60;
+    const ringAlpha = 1 - ringProgress;
+    ctx.globalAlpha = ringAlpha;
+    ctx.strokeStyle = '#f1c40f';
+    ctx.lineWidth = 3 * (1 - ringProgress) + 1;
+    ctx.beginPath();
+    ctx.arc(pcx, pcy, ringRadius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // 10 golden particles flying outward from the player position
+  if (elapsed < 2000) {
+    const particleProgress = elapsed / 2000;
+    const particleAlpha = 1 - particleProgress;
+    for (let i = 0; i < 10; i++) {
+      const angle = (i / 10) * Math.PI * 2 + i * 0.3;
+      const dist = particleProgress * 50 + 8;
+      const px = pcx + Math.cos(angle) * dist;
+      const py = pcy + Math.sin(angle) * dist;
+      const size = 2.5 * (1 - particleProgress);
+      ctx.globalAlpha = particleAlpha * 0.9;
+      ctx.fillStyle = '#ffd700';
+      ctx.beginPath();
+      ctx.arc(px, py, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // === Canvas-center HUD celebration ===
   ctx.globalAlpha = alpha;
 
   // Golden radial burst
@@ -1072,7 +1131,7 @@ export default function GameCanvas() {
       const screenX = monster.position.x * TILE_SIZE - camX;
       const screenY = monster.position.y * TILE_SIZE - camY;
       if (screenX > -TILE_SIZE && screenX < canvasWidth && screenY > -TILE_SIZE && screenY < canvasHeight) {
-        drawMonster(ctx, def.name, def.color, def.icon, screenX, screenY, monster.health, monster.maxHealth, def.sprites, monster.direction as Direction);
+        drawMonster(ctx, def.name, def.color, def.icon, screenX, screenY, monster.health, monster.maxHealth, def.sprites, monster.direction as Direction, monster.lastHitTime);
       }
     }
 
@@ -1088,6 +1147,11 @@ export default function GameCanvas() {
     const playerScreenY = currentPlayer.position.y * TILE_SIZE - camY;
     const hasBuff = Date.now() < currentBuffEnd;
     drawPlayerSprite(ctx, currentPlayer.name, playerScreenX, playerScreenY, currentPlayer.direction, '#e67e22', currentPlayer.stats.level, currentPlayer.stats.health, currentPlayer.stats.maxHealth, hasBuff);
+
+    // Level up celebration (in-world ring + particles, drawn after player, before spell effects)
+    if (levelUpTime > 0) {
+      renderLevelUpCelebration(ctx, canvasWidth, canvasHeight, levelUpTime, playerScreenX, playerScreenY);
+    }
 
     // Render spell effects
     renderSpellEffects(ctx, currentSpellEffects, camX, camY);
@@ -1146,10 +1210,6 @@ export default function GameCanvas() {
       ctx.fillText('🛡️ SAFE', canvasWidth / 2, 35);
     }
 
-    // Level up celebration
-    if (levelUpTime > 0) {
-      renderLevelUpCelebration(ctx, canvasWidth, canvasHeight, levelUpTime);
-    }
   }, []);
 
   // Game loop ref to avoid self-reference

@@ -368,3 +368,24 @@ Stage Summary:
 - No compilation or runtime errors
 - System is extensible - any monster can now have sprites by adding a `sprites` field
 - Wolves spawn in desert (west of town) and swamp (south of town) areas
+---
+Task ID: 2
+Agent: Main Agent + 3 Subagents
+Task: Multiple game improvements - skill point UX, visual effects, minimap
+
+Work Log:
+- Added quick "+" buttons on equipped skill slots in the hotbar when player has skill points (golden, bouncing, with tooltip)
+- Added floating golden banner above skill bar: "⭐ You have N Skill Points! Click + on skills or press K"
+- Made SP display in HUD clickable (opens Skill Management Panel)
+- Added monster hit flash effect (white overlay that fades over 150ms when monster takes damage)
+- Added `lastHitTime` field to MonsterInstance type
+- Enhanced level-up celebration with expanding golden ring and 10 golden particles around player
+- Improved minimap with: zone name label (e.g. "Tibia Town (Safe)"), vignette effect, pulsing player dot, compass "N" indicator, grid lines every 10 tiles, monster color coding by difficulty (green/yellow/orange/red)
+- Fixed lint error in Minimap.tsx (replaced useState+useEffect with direct computation)
+
+Stage Summary:
+- Skill points now have 3 ways to spend: quick "+" on hotbar, K panel, or click SP in HUD
+- Combat feels more responsive with hit flash feedback
+- Level-ups are more visually dramatic
+- Minimap is more informative with zone labels and danger-colored monsters
+- Zero compilation errors, zero runtime errors
