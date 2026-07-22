@@ -624,6 +624,13 @@ export const useGameStore = create<GameState>((set, get) => ({
               }
           }
         } else if (dist <= def.attackRange && now - monster.lastAttackTime > def.attackSpeed) {
+          const { matchPhase } = get();
+          // Do not attack if player is inside protection zone (except during Arena when safe zone shrinks)
+          if (matchPhase !== 'arena' && isInTown(player.position.x, player.position.y)) {
+              monster.targetId = undefined;
+              return { ...monster };
+          }
+
           // Attack player
           monster.lastAttackTime = now;
           get().setLastCombatTime(Date.now());
