@@ -810,11 +810,14 @@ export const useGameStore = create<GameState>((set, get) => ({
     const newX = player.position.x + dx;
     const newY = player.position.y + dy;
 
+    // Helper to just turn the player without moving
+    const turnPlayer = () => set(state => ({ player: state.player ? { ...state.player, direction } : null }));
+
     // Bounds check
-    if (newX < 0 || newX >= gameMap.tiles[0].length || newY < 0 || newY >= gameMap.tiles.length) return;
+    if (newX < 0 || newX >= gameMap.tiles[0].length || newY < 0 || newY >= gameMap.tiles.length) return turnPlayer();
 
     // Tile collision
-    if (isPositionBlocked(newX, newY, gameMap)) return;
+    if (isPositionBlocked(newX, newY, gameMap)) return turnPlayer();
 
     // Monster collision (don't walk on monsters)
     if (isMonsterAt(newX, newY, monsters)) {
@@ -828,7 +831,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           addChatMessage({ type: 'system', sender: 'System', content: `A ${def.name} is blocking your way!`, color: '#e67e22' });
         }
       }
-      return;
+      return turnPlayer();
     }
 
     // Can't enter safe zone while in combat (5s since last fight action)
@@ -836,7 +839,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const isEnteringTown = isInTown(newX, newY) && !isInTown(player.position.x, player.position.y);
     if (isEnteringTown && matchPhase !== 'arena' && Date.now() - lastCombatTime < 5000) {
       addChatMessage({ type: 'system', sender: 'System', content: "⚠️ You can't enter safe zone while in combat! (wait 5s)", color: '#e74c3c' });
-      return;
+      return turnPlayer();
     }
 
     set(state => ({
