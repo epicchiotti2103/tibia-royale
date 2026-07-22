@@ -415,10 +415,13 @@ export const useGameStore = create<GameState>((set, get) => ({
     const botDamageMap = new Map<string, number>();
 
     const newBots = bots.map(bot => {
-      if (now - bot.lastActionTime < 1000 / bot.stats.speed) return bot;
+      const canMove = now - bot.lastMoveTime >= 1000 / bot.stats.speed;
+      const canAttack = now - bot.lastAttackTime >= 1000;
       
-      updated = true;
-      let newBot = { ...bot, lastActionTime: now };
+      if (!canMove && !canAttack) return bot;
+      
+      let newBot = { ...bot };
+      let botUpdated = false;
       
       const { safeZoneRadius } = get();
       const distToCenter = Math.sqrt(Math.pow(bot.position.x - 50, 2) + Math.pow(bot.position.y - 50, 2));
@@ -430,22 +433,24 @@ export const useGameStore = create<GameState>((set, get) => ({
           newBot.stats.health = Math.min(bot.stats.maxHealth, bot.stats.health + 40);
           newBot.lastHealTime = now;
           addDamageNumber(bot.position, 40, 'heal');
+          botUpdated = true;
       }
 
       if (matchPhase === 'arena' && distToCenter > safeZoneRadius) {
           // Escape storm
-          if (Math.random() < 0.008 * deltaTime) { // Faster when escaping storm
+          if (canMove) {
               const dx = Math.sign(50 - bot.position.x);
               const dy = Math.sign(50 - bot.position.y);
               newBot.position = { x: bot.position.x + dx, y: bot.position.y + dy };
+              newBot.lastMoveTime = now;
+              botUpdated = true;
           }
       } else {
           // Find Targets
-          let closestTarget: { id: string, x: number, y: number, type: 'player' | 'bot' | 'monster' } | null = null;
+          let closestTarget: { id: string, x: number, y: number, type: 'player' | 'bot' | 'monster' | 'loot' } | null = null;
           let minDistance = Infinity;
 
           if (matchPhase === 'arena') {
-             // PvP Mode: Target Players and Bots
              if (player && player.stats.health > 0) {
                  const dist = Math.abs(player.position.x - bot.position.x) + Math.abs(player.position.y - bot.position.y);
                  closestTarget = { id: 'player', x: player.position.x, y: player.position.y, type: 'player' };
@@ -460,21 +465,17 @@ export const useGameStore = create<GameState>((set, get) => ({
                  }
              }
           } else if (matchPhase === 'hunting') {
-             // PvE Mode: Target Monsters or Loot
-             
-             // 1. If bot is a looter, scan for dropped loot
              if (bot.isLooter) {
                  const droppedLoot = get().droppedLoot;
                  for (const loot of droppedLoot) {
                      const dist = Math.abs(loot.position.x - bot.position.x) + Math.abs(loot.position.y - bot.position.y);
-                     if (dist < minDistance && dist < 15) { // Only care if it's somewhat close
-                         minDistance = dist - 50; // Massively prioritize loot over monsters
+                     if (dist < minDistance && dist < 15) { 
+                         minDistance = dist - 50; 
                          closestTarget = { id: loot.id, x: loot.position.x, y: loot.position.y, type: 'loot' };
                      }
                  }
              }
 
-             // 2. Scan Monsters
              const monstersList = get().monsters;
              for (const m of monstersList) {
                  if (m.isDead) continue;
@@ -482,7 +483,6 @@ export const useGameStore = create<GameState>((set, get) => ({
                  if (!mDef) continue;
                  const isHard = mDef.level >= 5;
                  
-                 // Risky bots prefer hard monsters, safe bots prefer easy
                  const isPreferred = (bot.huntingRisk === 'risky' && isHard) || (bot.huntingRisk === 'safe' && !isHard);
                  const dist = Math.abs(m.position.x - bot.position.x) + Math.abs(m.position.y - bot.position.y) + (isPreferred ? 0 : 30);
                  
@@ -498,70 +498,66 @@ export const useGameStore = create<GameState>((set, get) => ({
               let dx = Math.sign(closestTarget.x - bot.position.x);
               let dy = Math.sign(closestTarget.y - bot.position.y);
 
-              // Fleeing or Kiting
-              if (isFleeing || (bot.attackRange > 1 && trueDist <= 2)) {
-                 dx = -dx; // Reverse direction to run away
-                 dy = -dy;
-                 if (Math.random() < 0.006 * deltaTime) {
+              if (canMove) {
+                  if (isFleeing || (bot.attackRange > 1 && trueDist <= 2)) {
+                     dx = -dx; 
+                     dy = -dy;
                      const nx = bot.position.x + dx;
                      const ny = bot.position.y + dy;
                      if (!isPositionBlocked(nx, ny, gameMap)) {
                          newBot.position = { x: nx, y: ny };
+                         newBot.lastMoveTime = now;
+                         botUpdated = true;
                      }
-                 }
-              } else if (trueDist > bot.attackRange) {
-                 // Chase
-                 if (Math.random() < 0.005 * deltaTime) {
+                  } else if (trueDist > bot.attackRange) {
                      const nx = bot.position.x + dx;
                      const ny = bot.position.y + dy;
                      if (!isPositionBlocked(nx, ny, gameMap)) {
                          newBot.position = { x: nx, y: ny };
+                         newBot.lastMoveTime = now;
+                         botUpdated = true;
                      }
-                 }
-              } else if (trueDist <= bot.attackRange) {
-                 // Attack!
-                 if (now - bot.lastActionTime > 1000) {
-                     newBot.lastActionTime = now;
+                  }
+              }
+
+              if (canAttack && trueDist <= bot.attackRange) {
+                  newBot.lastAttackTime = now;
+                  botUpdated = true;
+                  
+                  if (closestTarget.type === 'player') {
+                     addDamageNumber(player!.position, bot.stats.attack, 'damage');
+                     get().addSpellEffect({ type: bot.attackRange > 1 ? 'projectile' : 'sword_slash', position: { ...player!.position }, direction: Direction.SOUTH, color: '#e74c3c', startTime: now, duration: 300 });
+                     set(s => ({ player: s.player ? { ...s.player, stats: { ...s.player.stats, health: s.player.stats.health - bot.stats.attack } } : null }));
+                  } else if (closestTarget.type === 'bot') {
+                     addDamageNumber({ x: closestTarget.x, y: closestTarget.y }, bot.stats.attack, 'damage');
+                     get().addSpellEffect({ type: bot.attackRange > 1 ? 'projectile' : 'sword_slash', position: { x: closestTarget.x, y: closestTarget.y }, direction: Direction.SOUTH, color: '#e74c3c', startTime: now, duration: 300 });
+                     botDamageMap.set(closestTarget.id, (botDamageMap.get(closestTarget.id) || 0) + bot.stats.attack);
+                  } else if (closestTarget.type === 'monster') {
+                     addDamageNumber({ x: closestTarget.x, y: closestTarget.y }, bot.stats.attack, 'damage');
+                     get().addSpellEffect({ type: bot.attackRange > 1 ? 'projectile' : 'sword_slash', position: { x: closestTarget.x, y: closestTarget.y }, direction: Direction.SOUTH, color: '#e74c3c', startTime: now, duration: 300 });
                      
-                     if (closestTarget.type === 'player') {
-                        addDamageNumber(player!.position, bot.stats.attack, 'damage');
-                        get().addSpellEffect({ type: bot.attackRange > 1 ? 'projectile' : 'sword_slash', position: { ...player!.position }, direction: Direction.SOUTH, color: '#e74c3c', startTime: now, duration: 300 });
-                        set(s => ({ player: s.player ? { ...s.player, stats: { ...s.player.stats, health: s.player.stats.health - bot.stats.attack } } : null }));
-                     } else if (closestTarget.type === 'bot') {
-                        addDamageNumber({ x: closestTarget.x, y: closestTarget.y }, bot.stats.attack, 'damage');
-                        get().addSpellEffect({ type: bot.attackRange > 1 ? 'projectile' : 'sword_slash', position: { x: closestTarget.x, y: closestTarget.y }, direction: Direction.SOUTH, color: '#e74c3c', startTime: now, duration: 300 });
-                        botDamageMap.set(closestTarget.id, (botDamageMap.get(closestTarget.id) || 0) + bot.stats.attack);
-                     } else if (closestTarget.type === 'monster') {
-                        // Attack Monster
-                        addDamageNumber({ x: closestTarget.x, y: closestTarget.y }, bot.stats.attack, 'damage');
-                        get().addSpellEffect({ type: bot.attackRange > 1 ? 'projectile' : 'sword_slash', position: { x: closestTarget.x, y: closestTarget.y }, direction: Direction.SOUTH, color: '#e74c3c', startTime: now, duration: 300 });
-                        
-                        const ml = get().monsters.map(m => {
-                            if (m.id === closestTarget!.id && !m.isDead) {
-                                const mH = m.health - bot.stats.attack;
-                                if (mH <= 0) {
-                                    // Bot killed monster! Level up!
-                                    newBot.stats.level += 1;
-                                    newBot.stats.attack += 2;
-                                    newBot.stats.maxHealth += 20;
-                                    newBot.stats.health = newBot.stats.maxHealth; // Full heal on level up
-                                    addDamageNumber(newBot.position, 0, 'xp');
-                                    return { ...m, health: 0, isDead: true, deathTime: now };
-                                }
-                                return { ...m, health: mH };
-                            }
-                            return m;
-                        });
-                        set({ monsters: ml });
-                     } else if (closestTarget.type === 'loot') {
-                        // Pick up loot!
-                        set(s => ({ droppedLoot: s.droppedLoot.filter(l => l.id !== closestTarget!.id) }));
-                     }
-                 }
+                     const ml = get().monsters.map(m => {
+                         if (m.id === closestTarget!.id && !m.isDead) {
+                             const mH = m.health - bot.stats.attack;
+                             if (mH <= 0) {
+                                 newBot.stats.level += 1;
+                                 newBot.stats.attack += 2;
+                                 newBot.stats.maxHealth += 20;
+                                 newBot.stats.health = newBot.stats.maxHealth; 
+                                 addDamageNumber(newBot.position, 0, 'xp');
+                                 return { ...m, health: 0, isDead: true, deathTime: now };
+                             }
+                             return { ...m, health: mH };
+                         }
+                         return m;
+                     });
+                     set({ monsters: ml });
+                  } else if (closestTarget.type === 'loot') {
+                     set(s => ({ droppedLoot: s.droppedLoot.filter(l => l.id !== closestTarget!.id) }));
+                  }
               }
           } else {
-             // Random wandering if no targets found
-             if (Math.random() < 0.002 * deltaTime) {
+             if (canMove && Math.random() < 0.2) {
                 const dirs = [{ x: 1, y: 0, dir: 1 }, { x: -1, y: 0, dir: 3 }, { x: 0, y: 1, dir: 2 }, { x: 0, y: -1, dir: 0 }];
                 const move = dirs[Math.floor(Math.random() * dirs.length)];
                 const nx = bot.position.x + move.x;
@@ -569,12 +565,14 @@ export const useGameStore = create<GameState>((set, get) => ({
                 if (!isPositionBlocked(nx, ny, gameMap)) {
                     newBot.position = { x: nx, y: ny };
                     newBot.direction = move.dir;
+                    newBot.lastMoveTime = now;
+                    botUpdated = true;
                 }
              }
           }
       }
-      return newBot;
-    });
+      if (botUpdated) updated = true;
+      return botUpdated ? newBot : bot;
 
     if (updated || botDamageMap.size > 0) {
         // Apply damage to bots

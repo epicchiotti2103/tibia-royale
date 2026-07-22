@@ -9,7 +9,8 @@ export interface BotInstance {
   stats: PlayerStats;
   targetId?: string; // monster or player
   targetType?: 'monster' | 'player' | 'bot' | 'loot';
-  lastActionTime: number;
+  lastMoveTime: number;
+  lastAttackTime: number;
   strategy: 'aggressive' | 'cautious' | 'looter';
   fleeThreshold: number; // 0.2 to 0.4
   huntingRisk: 'safe' | 'risky';
@@ -52,7 +53,8 @@ export function generateBots(count: number, spawnPoint: Position, riskyRatio: nu
       },
       direction: Direction.SOUTH,
       stats: calculateStats(vocation, 1),
-      lastActionTime: Date.now(),
+      lastMoveTime: Date.now(),
+      lastAttackTime: Date.now(),
       strategy,
       fleeThreshold: 0.2 + Math.random() * 0.2, // between 20% and 40%
       huntingRisk: Math.random() < riskyRatio ? 'risky' : 'safe',
