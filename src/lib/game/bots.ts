@@ -1,4 +1,4 @@
-import { Position, Direction, Vocation, PlayerStats } from './types';
+import { Position, Direction, Vocation, PlayerStats, calculateStats } from './types';
 
 export interface BotInstance {
   id: string;
@@ -22,7 +22,13 @@ const BOT_NAMES = [
   'Faker', 'Ninja', 'Shroud', 'Doublelift', 'Bjergsen',
   'TenZ', 'S1mple', 'ZywOo', 'Tox1c', 'NoobMaster69',
   'LordKilla', 'ShadowGamer', 'xXx_Sniper_xXx', 'Kacchan',
-  'PewPew', 'Goku123', 'DarkKnight', 'Asuna', 'Kirito'
+  'PewPew', 'Goku123', 'DarkKnight', 'Asuna', 'Kirito',
+  'Gaules', 'Fallen', 'Coldzera', 'Fer', 'Taco',
+  'Alanzoka', 'Jukes', 'Yoda', 'Kami', 'BRTT',
+  'Baiano', 'Pimpimenta', 'Rakin', 'Hastad', 'Jovi',
+  'Coringa', 'Loud_Babi', 'Nobru', 'Cerol', 'Piuzinho',
+  'Patife', 'DavyJones', 'BRKsEDU', 'Zangado', 'RatoBorrachudo',
+  'Cellbit', 'Felps', 'MtAspirina', 'Gordox', 'Lindinho'
 ];
 
 export function generateBots(count: number, spawnPoint: Position, riskyRatio: number = 0.5, looterRatio: number = 0.3): BotInstance[] {
@@ -45,21 +51,7 @@ export function generateBots(count: number, spawnPoint: Position, riskyRatio: nu
         y: spawnPoint.y + Math.floor(Math.random() * 20) - 10 
       },
       direction: Direction.SOUTH,
-      stats: {
-        level: 1,
-        experience: 0,
-        experienceToNext: 100,
-        health: 150,
-        maxHealth: 150,
-        mana: 50,
-        maxMana: 50,
-        attack: 10,
-        defense: 5,
-        magicAttack: 10,
-        magicDefense: 5,
-        speed: 3 + Math.random() * 2,
-        skillPoints: 0
-      },
+      stats: calculateStats(vocation, 1),
       lastActionTime: Date.now(),
       strategy,
       fleeThreshold: 0.2 + Math.random() * 0.2, // between 20% and 40%

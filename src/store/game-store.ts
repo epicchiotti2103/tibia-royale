@@ -556,9 +556,6 @@ export const useGameStore = create<GameState>((set, get) => ({
                      } else if (closestTarget.type === 'loot') {
                         // Pick up loot!
                         set(s => ({ droppedLoot: s.droppedLoot.filter(l => l.id !== closestTarget!.id) }));
-                        newBot.stats.attack += 1; // Slight buff from "equipping" stolen loot
-                        newBot.stats.maxHealth += 5;
-                        addDamageNumber({ x: closestTarget.x, y: closestTarget.y }, 0, 'heal'); // small green effect
                      }
                  }
               }
