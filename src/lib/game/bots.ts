@@ -8,9 +8,13 @@ export interface BotInstance {
   direction: Direction;
   stats: PlayerStats;
   targetId?: string; // monster or player
-  targetType?: 'monster' | 'player';
+  targetType?: 'monster' | 'player' | 'bot';
   lastActionTime: number;
   strategy: 'aggressive' | 'cautious' | 'looter';
+  fleeThreshold: number; // 0.2 to 0.4
+  huntingRisk: 'safe' | 'risky';
+  attackRange: number;
+  lastHealTime?: number;
 }
 
 const BOT_NAMES = [
@@ -29,6 +33,7 @@ export function generateBots(count: number, spawnPoint: Position): BotInstance[]
     const name = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)] + (Math.random() > 0.5 ? Math.floor(Math.random() * 99) : '');
     const vocation = vocations[Math.floor(Math.random() * vocations.length)];
     const strategy = strategies[Math.floor(Math.random() * strategies.length)];
+    const attackRange = vocation === 'Knight' ? 1 : (vocation === 'Paladin' ? 4 : 5);
 
     bots.push({
       id: `bot_${Date.now()}_${i}`,
@@ -55,7 +60,10 @@ export function generateBots(count: number, spawnPoint: Position): BotInstance[]
         skillPoints: 0
       },
       lastActionTime: Date.now(),
-      strategy
+      strategy,
+      fleeThreshold: 0.2 + Math.random() * 0.2, // between 20% and 40%
+      huntingRisk: Math.random() > 0.5 ? 'safe' : 'risky',
+      attackRange
     });
   }
 
