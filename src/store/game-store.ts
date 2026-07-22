@@ -460,13 +460,31 @@ export const useGameStore = create<GameState>((set, get) => ({
                         newBot.position = { x: bot.position.x + dx, y: bot.position.y + dy };
                     }
                 } else {
-                    if (closestTarget.type === 'player') {
-                        addDamageNumber(player!.position, bot.stats.attack, 'damage');
-                        // Apply player damage
-                        set(s => ({ player: s.player ? { ...s.player, stats: { ...s.player.stats, health: s.player.stats.health - bot.stats.attack } } : null }));
-                    } else {
-                        addDamageNumber({ x: closestTarget.x, y: closestTarget.y }, bot.stats.attack, 'damage');
-                        botDamageMap.set(closestTarget.id, (botDamageMap.get(closestTarget.id) || 0) + bot.stats.attack);
+                    // Attack cooldown for bots (approx 1 attack per second)
+                    if (now - bot.lastActionTime > 1000) {
+                        newBot.lastActionTime = now;
+                        if (closestTarget.type === 'player') {
+                            addDamageNumber(player!.position, bot.stats.attack, 'damage');
+                            
+                            // Visual Effect on player
+                            get().addSpellEffect({
+                                type: 'sword_slash', position: { ...player!.position },
+                                direction: Direction.SOUTH, color: '#e74c3c', startTime: now, duration: 300
+                            });
+                            
+                            // Apply player damage
+                            set(s => ({ player: s.player ? { ...s.player, stats: { ...s.player.stats, health: s.player.stats.health - bot.stats.attack } } : null }));
+                        } else {
+                            addDamageNumber({ x: closestTarget.x, y: closestTarget.y }, bot.stats.attack, 'damage');
+                            
+                            // Visual Effect on other bot
+                            get().addSpellEffect({
+                                type: 'sword_slash', position: { x: closestTarget.x, y: closestTarget.y },
+                                direction: Direction.SOUTH, color: '#e74c3c', startTime: now, duration: 300
+                            });
+                            
+                            botDamageMap.set(closestTarget.id, (botDamageMap.get(closestTarget.id) || 0) + bot.stats.attack);
+                        }
                     }
                 }
             }
@@ -644,6 +662,17 @@ export const useGameStore = create<GameState>((set, get) => ({
             addDamageNumber(player.position, 0, 'miss');
           } else {
             addDamageNumber(player.position, -result.damage, 'damage');
+            
+            // Visual Effect for monster attack
+            get().addSpellEffect({
+              type: 'sword_slash',
+              position: { ...player.position },
+              direction: monster.direction,
+              color: '#e74c3c',
+              startTime: now,
+              duration: 300,
+            });
+
             // Screen shake when hit
             set({ screenShakeTime: now });
           }
