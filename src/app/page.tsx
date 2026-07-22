@@ -14,10 +14,12 @@ import DeathScreen from '@/components/game/DeathScreen';
 import SkillsPanel from '@/components/game/SkillsPanel';
 import SkillManagementPanel from '@/components/game/SkillManagementPanel';
 import QuestLog from '@/components/game/QuestLog';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function HomePage() {
   const screen = useGameStore((s) => s.screen);
   const player = useGameStore((s) => s.player);
+  const isMobile = useIsMobile();
   const updateOtherPlayer = useGameStore((s) => s.updateOtherPlayer);
   const removeOtherPlayer = useGameStore((s) => s.removeOtherPlayer);
   const addChatMessage = useGameStore((s) => s.addChatMessage);
@@ -140,53 +142,72 @@ export default function HomePage() {
 
   // Broadcast chat messages
   useEffect(() => {
-    const unsub = useGameStore.subscribe(
-      (state) => state.chatMessages,
-      (messages) => {
-        const lastMsg = messages[messages.length - 1];
-        const currentPlayer = useGameStore.getState().player;
-        if (lastMsg && lastMsg.type === 'player' && socketRef.current && currentPlayer) {
-          socketRef.current.emit('chat-message', {
-            sender: lastMsg.sender,
-            content: lastMsg.content,
-            color: lastMsg.color,
-          });
-        }
+    const unsub = useGameStore.subscribe((state) => {
+      const messages = state.chatMessages;
+      const lastMsg = messages[messages.length - 1];
+      const currentPlayer = useGameStore.getState().player;
+      if (lastMsg && lastMsg.type === 'player' && socketRef.current && currentPlayer) {
+        socketRef.current.emit('chat-message', {
+          sender: lastMsg.sender,
+          content: lastMsg.content,
+          color: lastMsg.color,
+        });
       }
-    );
+    });
     return unsub;
   }, []);
+
+  // Auto-save every 30 seconds
+  const savePlayer = useGameStore((s) => s.savePlayer);
+  useEffect(() => {
+    if (screen !== 'game' || !player) return;
+    const interval = setInterval(() => {
+      useGameStore.getState().savePlayer();
+    }, 30000);
+    // Also save on page unload
+    const handleUnload = () => { useGameStore.getState().savePlayer(); };
+    window.addEventListener('beforeunload', handleUnload);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('beforeunload', handleUnload);
+      // Save when leaving game
+      useGameStore.getState().savePlayer();
+    };
+  }, [screen === 'game']);
 
   if (screen === 'login') {
     return <GameLogin />;
   }
 
   return (
-    <div className="w-screen h-screen bg-black overflow-hidden relative" tabIndex={0}>
+    <div className="w-screen h-[100dvh] bg-black overflow-hidden relative" tabIndex={0}>
       {/* Game Canvas */}
       <GameCanvas />
 
       {/* HUD Overlay */}
       <GameHUD />
 
-      {/* Minimap - positioned properly */}
-      <div className="absolute top-14 right-2 z-10">
-        <Minimap />
-      </div>
+      {/* Desktop Panels - Hidden on Mobile to prevent overlap */}
+      {!isMobile && (
+        <>
+          {/* Minimap - positioned properly */}
+          <div className="absolute top-14 right-2 z-10">
+            <Minimap />
+          </div>
 
-      {/* Quest Log - right side */}
-      <QuestLog />
+          {/* Quest Log - right side */}
+          <QuestLog />
 
-      {/* Chat Panel - bottom left */}
-      <ChatPanel />
+          {/* Chat Panel - bottom left */}
+          <ChatPanel />
 
-      {/* Inventory Panel - top right */}
+          {/* Skills Bar - bottom center */}
+          <SkillsPanel />
+        </>
+      )}
+
+      {/* Panels that work on both Desktop and Mobile */}
       <InventoryPanel />
-
-      {/* Skills Bar - bottom center */}
-      <SkillsPanel />
-
-      {/* NPC Dialog */}
       <NPCDialog />
 
       {/* Death Screen Overlay */}
@@ -195,10 +216,12 @@ export default function HomePage() {
       {/* Skill Management Panel (overlay) */}
       <SkillManagementPanel />
 
-      {/* Controls hint */}
-      <div className="absolute bottom-14 right-2 z-10 bg-black/60 rounded px-2 py-1 text-[10px] text-gray-500">
-        WASD: Move | SPC: Attack | I/O/P: Skills | K: Skill Panel | Q: Potion | 1-9: Items | E: NPC
-      </div>
+      {/* Controls hint (desktop only, references keyboard keys) */}
+      {!isMobile && (
+        <div className="absolute bottom-14 right-2 z-10 bg-black/60 rounded px-2 py-1 text-[10px] text-gray-500">
+          WASD: Move | SPC: Attack | I/O/P: Skills | K: Skill Panel | Q: Potion | 1-9: Items | E: NPC
+        </div>
+      )}
     </div>
   );
 }

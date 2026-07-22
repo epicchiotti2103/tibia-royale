@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useGameStore } from '@/store/game-store';
 import { ITEMS } from '@/lib/game/items';
 import { EquipSlot, Rarity, ItemType } from '@/lib/game/types';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const RARITY_COLORS: Record<Rarity, string> = {
   [Rarity.COMMON]: '#9ca3af',
@@ -29,7 +30,12 @@ export default function InventoryPanel() {
   const equipItem = useGameStore((s) => s.equipItem);
   const unequipItem = useGameStore((s) => s.unequipItem);
   const consumeInventoryItem = useGameStore((s) => s.consumeInventoryItem);
-  const [isOpen, setIsOpen] = useState(false);
+  const showInventoryPanel = useGameStore((s) => s.showInventoryPanel);
+  const toggleInventoryPanel = useGameStore((s) => s.toggleInventoryPanel);
+  const isMobile = useIsMobile();
+  
+  // Local state for desktop toggle (since desktop still uses the top-right accordion)
+  const [isDesktopOpen, setIsDesktopOpen] = useState(false);
   const [tab, setTab] = useState<'inventory' | 'equipment'>('inventory');
 
   const renderItemTooltip = (itemId: string) => {
@@ -59,11 +65,90 @@ export default function InventoryPanel() {
 
   if (!player) return null;
 
+  const isOpen = isMobile ? showInventoryPanel : isDesktopOpen;
+
+  // Render Mobile Modal Version
+  if (isMobile) {
+    if (!isOpen) return null;
+    return (
+      <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-auto">
+        <div className="bg-black/95 border-2 border-amber-700/80 rounded-xl p-3 w-[340px] max-h-[85dvh] flex flex-col shadow-2xl">
+          <div className="flex justify-between items-center border-b border-amber-700/50 pb-2 mb-2">
+            <h2 className="text-amber-400 font-black text-lg">📦 INVENTÁRIO</h2>
+            <button onClick={toggleInventoryPanel} className="text-gray-400 hover:text-white text-xl px-2">
+              ✕
+            </button>
+          </div>
+          
+          <div className="flex gap-1 mb-2">
+            <button onClick={() => setTab('inventory')} className={`flex-1 py-2 text-xs font-bold rounded ${tab === 'inventory' ? 'bg-amber-700 text-white' : 'bg-gray-800 text-gray-400'}`}>Items</button>
+            <button onClick={() => setTab('equipment')} className={`flex-1 py-2 text-xs font-bold rounded ${tab === 'equipment' ? 'bg-amber-700 text-white' : 'bg-gray-800 text-gray-400'}`}>Equipment</button>
+          </div>
+
+          <div className="overflow-y-auto custom-scrollbar flex-1">
+            {tab === 'inventory' ? (
+              <div className="grid grid-cols-5 gap-2">
+                {player.inventory.map((invItem, index) => {
+                  const itemDef = ITEMS[invItem.itemId];
+                  if (!itemDef) return null;
+                  const rarityColor = RARITY_COLORS[itemDef.rarity];
+                  return (
+                    <button
+                      key={invItem.id}
+                      onClick={() => {
+                        if (itemDef.type === ItemType.CONSUMABLE) consumeInventoryItem(invItem.id);
+                        else equipItem(invItem.id);
+                      }}
+                      className="w-[52px] h-[52px] bg-gray-800 border-2 rounded-lg flex flex-col items-center justify-center relative active:scale-95 transition-transform"
+                      style={{ borderColor: rarityColor }}
+                    >
+                      <span className="text-2xl">{itemDef.icon}</span>
+                      {invItem.quantity > 1 && (
+                        <span className="absolute -bottom-1 -right-1 bg-black text-[10px] font-bold text-yellow-400 px-1 rounded-full border border-yellow-700">{invItem.quantity}</span>
+                      )}
+                    </button>
+                  );
+                })}
+                {Array.from({ length: Math.max(0, 15 - player.inventory.length) }).map((_, i) => (
+                  <div key={`empty-${i}`} className="w-[52px] h-[52px] bg-gray-900/50 border border-gray-800 rounded-lg" />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {Object.values(EquipSlot).map((slot) => {
+                  const equippedId = player.equipment[slot];
+                  const itemDef = equippedId ? ITEMS[equippedId] : null;
+                  return (
+                    <div
+                      key={slot}
+                      onClick={() => equippedId && unequipItem(slot)}
+                      className="flex items-center gap-3 p-2 bg-gray-800 rounded-lg cursor-pointer active:bg-gray-700 border border-gray-700"
+                    >
+                      <span className="text-xs font-bold text-gray-400 w-16">{SLOT_LABELS[slot].split(' ')[1]}</span>
+                      {itemDef ? (
+                        <>
+                          <span className="text-2xl">{itemDef.icon}</span>
+                          <span className="text-sm font-bold truncate" style={{ color: RARITY_COLORS[itemDef.rarity] }}>{itemDef.name}</span>
+                        </>
+                      ) : (
+                        <span className="text-xs text-gray-600 italic">Empty</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Render Desktop Version
   return (
     <div className={`absolute top-12 right-0 z-20 ${isOpen ? 'w-72' : ''}`}>
-      {/* Toggle button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => setIsDesktopOpen(!isOpen)}
         className="bg-black/80 border border-amber-700/50 rounded-t-lg px-3 py-1 text-amber-400 text-xs font-bold hover:bg-black/90"
       >
         {isOpen ? '▼' : '▲'} 📦 Inventory

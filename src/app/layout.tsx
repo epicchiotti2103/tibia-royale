@@ -13,8 +13,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Tibia Lands - MMORPG",
-  description: "A classic Tibia-style MMORPG adventure game",
+  title: "Tibia Royale",
+  description: "A Battle Royale MMORPG adventure game",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Tibia Royale",
+  },
+  themeColor: "#000000",
 };
 
 export default function RootLayout({

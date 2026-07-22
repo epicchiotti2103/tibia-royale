@@ -282,6 +282,25 @@ export function generateGameMap(): GameMap {
         'pendant_of_vitality',
         'ring_of_the_abyss',
         'berserker_ring',
+        'raw_meat',
+        'feather',
+        'crab_claw',
+        'bone_sword',
+        'spiked_club',
+        'hunter_bow',
+        'rune_blade',
+        'tribal_shield',
+        'iron_helm',
+        'wolf_pelt_cloak',
+        'war_hammer',
+        'frost_staff',
+        'hunting_crossbow',
+        'tortoise_shield',
+        'wolf_helm',
+        'mercenary_sword',
+        'iron_gauntlets',
+        'gemstone_ring',
+        'spirit_amulet',
       ],
     },
     {
@@ -319,24 +338,24 @@ export function generateGameMap(): GameMap {
     {
       id: 'forest_easy',
       area: { x: 8, y: 4, width: 80, height: 24 },
-      monsterIds: ['rat', 'bat', 'snake'],
-      maxMonsters: 20,
+      monsterIds: ['rat', 'bat', 'snake', 'wild_dog'],
+      maxMonsters: 25,
       spawnRate: 4000,
     },
     // Forest clearing - medium (spiders, goblins)
     {
       id: 'forest_medium',
       area: { x: 40, y: 10, width: 20, height: 10 },
-      monsterIds: ['spider', 'goblin'],
-      maxMonsters: 12,
+      monsterIds: ['spider', 'goblin', 'wild_dog', 'mantis'],
+      maxMonsters: 16,
       spawnRate: 6000,
     },
     // Swamp - medium (snakes, spiders, wolves, scorpions)
     {
       id: 'swamp',
       area: { x: 5, y: 65, width: 60, height: 33 },
-      monsterIds: ['snake', 'spider', 'wolf', 'scorpion'],
-      maxMonsters: 25,
+      monsterIds: ['snake', 'spider', 'wolf', 'scorpion', 'toad', 'thornback'],
+      maxMonsters: 30,
       spawnRate: 5000,
     },
     // Desert - medium-hard (wolves, orcs, trolls)
@@ -351,16 +370,16 @@ export function generateGameMap(): GameMap {
     {
       id: 'cave',
       area: { x: 78, y: 20, width: 12, height: 15 },
-      monsterIds: ['skeleton', 'wraith', 'dark_mage'],
-      maxMonsters: 12,
+      monsterIds: ['skeleton', 'wraith', 'dark_mage', 'ghost'],
+      maxMonsters: 15,
       spawnRate: 7000,
     },
     // Deep cave - very hard (dark mages, fire elementals, demons)
     {
       id: 'deep_cave',
       area: { x: 70, y: 40, width: 15, height: 12 },
-      monsterIds: ['dark_mage', 'fire_elemental', 'demon'],
-      maxMonsters: 10,
+      monsterIds: ['dark_mage', 'fire_elemental', 'demon', 'stone_golem', 'ghost'],
+      maxMonsters: 12,
       spawnRate: 10000,
     },
     // Snow peak - hard (wraiths, trolls)
@@ -399,8 +418,8 @@ export function generateGameMap(): GameMap {
     {
       id: 'forest_rabbits',
       area: { x: 15, y: 5, width: 20, height: 15 },
-      monsterIds: ['rabbit', 'bee'],
-      maxMonsters: 15,
+      monsterIds: ['rabbit', 'bee', 'cat'],
+      maxMonsters: 18,
       spawnRate: 3000,
     },
     // Bandit camp in forest
@@ -423,8 +442,8 @@ export function generateGameMap(): GameMap {
     {
       id: 'swamp_creatures',
       area: { x: 20, y: 75, width: 25, height: 20 },
-      monsterIds: ['mushroom', 'boar', 'scorpion'],
-      maxMonsters: 18,
+      monsterIds: ['mushroom', 'boar', 'scorpion', 'toad'],
+      maxMonsters: 20,
       spawnRate: 5000,
     },
     // Deep cave expansion - golems and necromancers
@@ -467,6 +486,14 @@ export function generateGameMap(): GameMap {
       maxMonsters: 6,
       spawnRate: 20000,
     },
+    // === NEW ANIMAL ZONES ===
+    { id: 'forest_deer', area: { x: 25, y: 5, width: 20, height: 15 }, monsterIds: ['deer', 'rabbit', 'bee'], maxMonsters: 15, spawnRate: 4000 },
+    { id: 'forest_bear', area: { x: 60, y: 8, width: 20, height: 12 }, monsterIds: ['bear', 'wolf', 'deer', 'war_wolf'], maxMonsters: 14, spawnRate: 8000 },
+    { id: 'swamp_croc', area: { x: 10, y: 80, width: 25, height: 15 }, monsterIds: ['crocodile', 'frog', 'snake'], maxMonsters: 15, spawnRate: 5000 },
+    { id: 'beach_crabs', area: { x: 40, y: 65, width: 15, height: 8 }, monsterIds: ['crab', 'snake'], maxMonsters: 12, spawnRate: 4000 },
+    { id: 'mountain_hawks', area: { x: 72, y: 8, width: 15, height: 12 }, monsterIds: ['hawk', 'wraith', 'eagle'], maxMonsters: 12, spawnRate: 6000 },
+    { id: 'labyrinth', area: { x: 75, y: 55, width: 20, height: 15 }, monsterIds: ['minotaur', 'skeleton', 'golem', 'stone_golem'], maxMonsters: 12, spawnRate: 10000 },
+    { id: 'desert_cobra', area: { x: 5, y: 30, width: 15, height: 15 }, monsterIds: ['cobra', 'scorpion', 'bandit'], maxMonsters: 15, spawnRate: 5000 },
   ];
 
   return {

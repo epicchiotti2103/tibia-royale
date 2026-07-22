@@ -89,6 +89,7 @@ export default function Minimap() {
     const centerY = viewRadius;
 
     function draw(timestamp: number) {
+      if (!canvas || !ctx || !player) return;
       const time = timestamp / 1000;
 
       ctx.fillStyle = '#111';

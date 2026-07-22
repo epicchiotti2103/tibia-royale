@@ -39,29 +39,27 @@ export default function QuestLog() {
 
   // Track level changes using store subscription (not setState in effect)
   useEffect(() => {
-    const unsub = useGameStore.subscribe(
-      (state) => state.player?.stats.level,
-      (level) => {
-        if (!level) return;
-        if (level === lastLevelRef.current) return;
-        lastLevelRef.current = level;
-        setQuests(prev => prev.map(q => {
-          if (q.type === 'level' && !q.completed) {
-            const newProgress = Math.min(q.required, level);
-            const isNowCompleted = newProgress >= q.required;
-            if (isNowCompleted) {
-              setTimeout(() => completeQuestCbRef.current(q), 500);
-            }
-            return { ...q, progress: newProgress, completed: isNowCompleted };
+    const unsub = useGameStore.subscribe((state) => {
+      const level = state.player?.stats.level;
+      if (!level) return;
+      if (level === lastLevelRef.current) return;
+      lastLevelRef.current = level;
+      setQuests(prev => prev.map(q => {
+        if (q.type === 'level' && !q.completed) {
+          const newProgress = Math.min(q.required, level);
+          const isNowCompleted = newProgress >= q.required;
+          if (isNowCompleted && completeQuestCbRef.current) {
+            setTimeout(() => completeQuestCbRef.current!(q), 500);
           }
-          return q;
-        }));
-      }
-    );
+          return { ...q, progress: newProgress, completed: isNowCompleted };
+        }
+        return q;
+      }));
+    });
     return unsub;
   }, []);
 
-  const completeQuestCbRef = useRef<(quest: Quest) => void>();
+  const completeQuestCbRef = useRef<((quest: Quest) => void) | null>(null);
   completeQuestCbRef.current = (quest: Quest) => { // eslint-disable-line react-hooks/immutability
     setQuests(prev => prev.map(q => q.id === quest.id ? { ...q, completed: true } : q));
     addChatMessage({ type: 'system', sender: 'Quest Complete!', content: `🎉 ${quest.name} completed! +${quest.reward.gold}g +${quest.reward.exp}XP`, color: '#f1c40f' });
@@ -80,7 +78,8 @@ export default function QuestLog() {
           const newProgress = q.progress + 1;
           const isNowCompleted = newProgress >= q.required;
           if (isNowCompleted && completeQuestCbRef.current) {
-            setTimeout(() => completeQuestCbRef.current(q), 500);
+            const cb = completeQuestCbRef.current;
+            setTimeout(() => cb(q), 500);
           }
           return { ...q, progress: newProgress, completed: isNowCompleted };
         }

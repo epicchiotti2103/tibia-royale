@@ -205,12 +205,23 @@ export interface PlayerData {
   gold: number;
 }
 
+export interface DroppedLoot {
+  id: string;
+  position: Position;
+  itemId: string;
+  quantity: number;
+  expiresAt: number;
+}
+
 export interface MonsterInstance {
   id: string;
   definitionId: string;
   position: Position;
   health: number;
   maxHealth: number;
+  attack?: number;
+  defense?: number;
+  lootTable?: LootDrop[];
   lastAttackTime: number;
   targetId?: string;
   spawnPosition: Position;
@@ -393,22 +404,22 @@ export function calculateStats(vocation: Vocation, level: number): PlayerStats {
 }
 
 export const TILE_COLORS: Record<TileType, string> = {
-  [TileType.GRASS]: '#4a7c3f',
-  [TileType.DIRT]: '#8b7355',
-  [TileType.WATER]: '#3b6db5',
-  [TileType.STONE]: '#808080',
-  [TileType.SAND]: '#d4bc7c',
-  [TileType.SNOW]: '#e8e8f0',
-  [TileType.LAVA]: '#d44a00',
-  [TileType.WALL]: '#5a5a5a',
-  [TileType.WOOD_FLOOR]: '#a0784c',
-  [TileType.STONE_FLOOR]: '#9a9a9a',
-  [TileType.DARK_GRASS]: '#2d5a25',
-  [TileType.SWAMP]: '#4a6b3a',
-  [TileType.BRIDGE]: '#8b6914',
-  [TileType.TREE]: '#2d6b1e',
-  [TileType.ROCK]: '#6b6b6b',
-  [TileType.BUSH]: '#3a7a2e',
-  [TileType.STAIRS_DOWN]: '#4a4a4a',
-  [TileType.STAIRS_UP]: '#6a6a6a',
+  [TileType.GRASS]: '#2a4a22',
+  [TileType.DIRT]: '#4a3a2a',
+  [TileType.WATER]: '#1a3a5a',
+  [TileType.STONE]: '#3a3a3a',
+  [TileType.SAND]: '#8a7a4a',
+  [TileType.SNOW]: '#b0b8c8',
+  [TileType.LAVA]: '#8a2000',
+  [TileType.WALL]: '#2a2a2a',
+  [TileType.WOOD_FLOOR]: '#5a3a1a',
+  [TileType.STONE_FLOOR]: '#4a4a4a',
+  [TileType.DARK_GRASS]: '#152a10',
+  [TileType.SWAMP]: '#1a3a12',
+  [TileType.BRIDGE]: '#4a3510',
+  [TileType.TREE]: '#0a3a08',
+  [TileType.ROCK]: '#3a3a3a',
+  [TileType.BUSH]: '#1a4a14',
+  [TileType.STAIRS_DOWN]: '#2a2a2a',
+  [TileType.STAIRS_UP]: '#4a4a4a',
 };

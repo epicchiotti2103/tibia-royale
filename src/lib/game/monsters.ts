@@ -25,6 +25,10 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     chaseRange: 3,
     attackRange: 1,
     attackSpeed: 2000,
+    sprites: {
+      north: '/sprites/rat/north.png', south: '/sprites/rat/south.png',
+      east: '/sprites/rat/east.png', west: '/sprites/rat/west.png',
+    },
   },
   bat: {
     id: 'bat',
@@ -66,6 +70,10 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     chaseRange: 5,
     attackRange: 1,
     attackSpeed: 1500,
+    sprites: {
+      north: '/sprites/snake/north.png', south: '/sprites/snake/south.png',
+      east: '/sprites/snake/east.png', west: '/sprites/snake/west.png',
+    },
   },
 
   // === MEDIUM (Forest/Desert) ===
@@ -89,6 +97,10 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     chaseRange: 6,
     attackRange: 1,
     attackSpeed: 1200,
+    sprites: {
+      north: '/sprites/spider/north.png', south: '/sprites/spider/south.png',
+      east: '/sprites/spider/east.png', west: '/sprites/spider/west.png',
+    },
   },
   goblin: {
     id: 'goblin',
@@ -135,10 +147,10 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     attackRange: 1,
     attackSpeed: 1500,
     sprites: {
-      north: '/sprites/wolf/north.jpg',
-      south: '/sprites/wolf/south.jpg',
-      east: '/sprites/wolf/east.jpg',
-      west: '/sprites/wolf/west.jpg',
+      north: '/sprites/wolf/north.png?v=2',
+      south: '/sprites/wolf/south.png?v=2',
+      east: '/sprites/wolf/east.png?v=2',
+      west: '/sprites/wolf/west.png?v=2',
     },
   },
   scorpion: {
@@ -187,6 +199,10 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     chaseRange: 8,
     attackRange: 1,
     attackSpeed: 1800,
+    sprites: {
+      north: '/sprites/orc/north.png', south: '/sprites/orc/south.png',
+      east: '/sprites/orc/east.png', west: '/sprites/orc/west.png',
+    },
   },
   troll: {
     id: 'troll',
@@ -233,6 +249,10 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     chaseRange: 6,
     attackRange: 1,
     attackSpeed: 1600,
+    sprites: {
+      north: '/sprites/skeleton/north.png', south: '/sprites/skeleton/south.png',
+      east: '/sprites/skeleton/east.png', west: '/sprites/skeleton/west.png',
+    },
   },
   wraith: {
     id: 'wraith',
@@ -333,6 +353,10 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     chaseRange: 12,
     attackRange: 2,
     attackSpeed: 2000,
+    sprites: {
+      north: '/sprites/demon/north.png', south: '/sprites/demon/south.png',
+      east: '/sprites/demon/east.png', west: '/sprites/demon/west.png',
+    },
   },
 
   // === LEGENDARY ===
@@ -360,6 +384,10 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     chaseRange: 15,
     attackRange: 3,
     attackSpeed: 2500,
+    sprites: {
+      north: '/sprites/dragon/north.png', south: '/sprites/dragon/south.png',
+      east: '/sprites/dragon/east.png', west: '/sprites/dragon/west.png',
+    },
   },
   demon_lord: {
     id: 'demon_lord',
@@ -705,6 +733,178 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     chaseRange: 30,
     attackRange: 5,
     attackSpeed: 2500,
+  },
+
+  // === NEW ANIMALS ===
+  deer: {
+    id: 'deer', name: 'Deer', health: 35, maxHealth: 35, attack: 5, defense: 3, speed: 6, experience: 25,
+    lootTable: [
+      { itemId: 'gold_coin', chance: 0.6, minQuantity: 2, maxQuantity: 8 },
+      { itemId: 'raw_meat', chance: 0.4, minQuantity: 1, maxQuantity: 2 },
+    ],
+    color: '#A0522D', icon: '🦌', aggressive: false, chaseRange: 6, attackRange: 1, attackSpeed: 1800,
+  },
+  bear: {
+    id: 'bear', name: 'Brown Bear', health: 200, maxHealth: 200, attack: 35, defense: 20, speed: 3, experience: 120,
+    lootTable: [
+      { itemId: 'gold_coin', chance: 1, minQuantity: 20, maxQuantity: 60 },
+      { itemId: 'health_potion_medium', chance: 0.25, minQuantity: 1, maxQuantity: 2 },
+      { itemId: 'raw_meat', chance: 0.5, minQuantity: 2, maxQuantity: 4 },
+      { itemId: 'bear_pelt', chance: 0.15, minQuantity: 1, maxQuantity: 1 },
+    ],
+    color: '#5C3317', icon: '🐻', aggressive: true, chaseRange: 8, attackRange: 1, attackSpeed: 1800,
+    sprites: {
+      north: '/sprites/bear/north.png', south: '/sprites/bear/south.png',
+      east: '/sprites/bear/east.png', west: '/sprites/bear/west.png',
+    },
+  },
+  crocodile: {
+    id: 'crocodile', name: 'Crocodile', health: 150, maxHealth: 150, attack: 30, defense: 18, speed: 2.5, experience: 90,
+    lootTable: [
+      { itemId: 'gold_coin', chance: 1, minQuantity: 15, maxQuantity: 50 },
+      { itemId: 'health_potion_medium', chance: 0.2, minQuantity: 1, maxQuantity: 2 },
+      { itemId: 'crocodile_skin', chance: 0.12, minQuantity: 1, maxQuantity: 1 },
+    ],
+    color: '#2E5A1E', icon: '🐊', aggressive: true, chaseRange: 5, attackRange: 1, attackSpeed: 2000,
+  },
+  frog: {
+    id: 'frog', name: 'Giant Frog', health: 20, maxHealth: 20, attack: 6, defense: 2, speed: 4, experience: 12,
+    lootTable: [
+      { itemId: 'gold_coin', chance: 0.5, minQuantity: 1, maxQuantity: 5 },
+    ],
+    color: '#228B22', icon: '🐸', aggressive: false, chaseRange: 3, attackRange: 1, attackSpeed: 1200,
+  },
+  hawk: {
+    id: 'hawk', name: 'Hawk', health: 45, maxHealth: 45, attack: 15, defense: 5, speed: 5.5, experience: 35,
+    lootTable: [
+      { itemId: 'gold_coin', chance: 0.8, minQuantity: 5, maxQuantity: 15 },
+      { itemId: 'feather', chance: 0.3, minQuantity: 1, maxQuantity: 3 },
+    ],
+    color: '#4A3520', icon: '🦅', aggressive: true, chaseRange: 10, attackRange: 1, attackSpeed: 1000,
+  },
+  crab: {
+    id: 'crab', name: 'Giant Crab', health: 40, maxHealth: 40, attack: 14, defense: 15, speed: 2, experience: 30,
+    lootTable: [
+      { itemId: 'gold_coin', chance: 0.8, minQuantity: 3, maxQuantity: 12 },
+      { itemId: 'crab_claw', chance: 0.2, minQuantity: 1, maxQuantity: 2 },
+    ],
+    color: '#B22222', icon: '🦀', aggressive: true, chaseRange: 3, attackRange: 1, attackSpeed: 1800,
+  },
+  minotaur: {
+    id: 'minotaur', name: 'Minotaur', health: 350, maxHealth: 350, attack: 50, defense: 30, speed: 3, experience: 220,
+    lootTable: [
+      { itemId: 'gold_coin', chance: 1, minQuantity: 40, maxQuantity: 120 },
+      { itemId: 'health_potion_large', chance: 0.3, minQuantity: 1, maxQuantity: 3 },
+      { itemId: 'battle_axe', chance: 0.1, minQuantity: 1, maxQuantity: 1 },
+      { itemId: 'plate_armor', chance: 0.06, minQuantity: 1, maxQuantity: 1 },
+      { itemId: 'minotaur_horn', chance: 0.15, minQuantity: 1, maxQuantity: 2 },
+    ],
+    color: '#6B3A1A', icon: '🐂', aggressive: true, chaseRange: 10, attackRange: 1, attackSpeed: 1600,
+  },
+  cobra: {
+    id: 'cobra', name: 'King Cobra', health: 100, maxHealth: 100, attack: 28, defense: 8, speed: 4, experience: 75,
+    lootTable: [
+      { itemId: 'gold_coin', chance: 1, minQuantity: 12, maxQuantity: 40 },
+      { itemId: 'health_potion_medium', chance: 0.2, minQuantity: 1, maxQuantity: 1 },
+      { itemId: 'snake_venom', chance: 0.15, minQuantity: 1, maxQuantity: 2 },
+    ],
+    color: '#1A4A0E', icon: '🐍', aggressive: true, chaseRange: 6, attackRange: 1, attackSpeed: 1200,
+  },
+
+  // === NEW BEASTS & CREATURES ===
+  wild_dog: {
+    id: 'wild_dog', name: 'Wild Dog', health: 35, maxHealth: 35, attack: 10, defense: 4, speed: 5, experience: 25,
+    lootTable: [
+      { itemId: 'gold_coin', chance: 0.7, minQuantity: 1, maxQuantity: 8 },
+      { itemId: 'leather_helmet', chance: 0.05, minQuantity: 1, maxQuantity: 1 },
+      { itemId: 'raw_meat', chance: 0.3, minQuantity: 1, maxQuantity: 2 },
+    ],
+    color: '#8B6914', icon: '🐕', aggressive: true, chaseRange: 6, attackRange: 1, attackSpeed: 1500,
+  },
+  cat: {
+    id: 'cat', name: 'Stray Cat', health: 8, maxHealth: 8, attack: 2, defense: 1, speed: 6, experience: 5,
+    lootTable: [
+      { itemId: 'gold_coin', chance: 0.2, minQuantity: 1, maxQuantity: 2 },
+      { itemId: 'feather', chance: 0.05, minQuantity: 1, maxQuantity: 1 },
+    ],
+    color: '#FF8C00', icon: '🐱', aggressive: false, chaseRange: 2, attackRange: 1, attackSpeed: 2000,
+  },
+  toad: {
+    id: 'toad', name: 'Giant Toad', health: 30, maxHealth: 30, attack: 6, defense: 3, speed: 2, experience: 15,
+    lootTable: [
+      { itemId: 'gold_coin', chance: 0.6, minQuantity: 1, maxQuantity: 6 },
+      { itemId: 'mana_potion_small', chance: 0.15, minQuantity: 1, maxQuantity: 1 },
+    ],
+    color: '#2E8B57', icon: '🐸', aggressive: false, chaseRange: 2, attackRange: 1, attackSpeed: 2000,
+  },
+  mantis: {
+    id: 'mantis', name: 'Giant Mantis', health: 45, maxHealth: 45, attack: 16, defense: 6, speed: 5, experience: 40,
+    lootTable: [
+      { itemId: 'gold_coin', chance: 0.8, minQuantity: 3, maxQuantity: 15 },
+      { itemId: 'health_potion_small', chance: 0.2, minQuantity: 1, maxQuantity: 1 },
+      { itemId: 'feather', chance: 0.25, minQuantity: 1, maxQuantity: 3 },
+    ],
+    color: '#228B22', icon: '🦗', aggressive: true, chaseRange: 5, attackRange: 1, attackSpeed: 1200,
+  },
+  war_wolf: {
+    id: 'war_wolf', name: 'War Wolf', health: 100, maxHealth: 100, attack: 28, defense: 12, speed: 5, experience: 75,
+    lootTable: [
+      { itemId: 'gold_coin', chance: 1, minQuantity: 10, maxQuantity: 35 },
+      { itemId: 'health_potion_medium', chance: 0.2, minQuantity: 1, maxQuantity: 2 },
+      { itemId: 'wolf_pelt_cloak', chance: 0.1, minQuantity: 1, maxQuantity: 1 },
+      { itemId: 'leather_armor', chance: 0.05, minQuantity: 1, maxQuantity: 1 },
+      { itemId: 'war_wolf_fang', chance: 0.25, minQuantity: 1, maxQuantity: 2 },
+    ],
+    color: '#2F2F2F', icon: '🐺', aggressive: true, chaseRange: 8, attackRange: 1, attackSpeed: 1400,
+  },
+  wild_boar: {
+    id: 'wild_boar', name: 'Wild Boar', health: 70, maxHealth: 70, attack: 20, defense: 10, speed: 4, experience: 55,
+    lootTable: [
+      { itemId: 'gold_coin', chance: 0.9, minQuantity: 5, maxQuantity: 20 },
+      { itemId: 'raw_meat', chance: 0.4, minQuantity: 1, maxQuantity: 3 },
+      { itemId: 'leather_legs', chance: 0.08, minQuantity: 1, maxQuantity: 1 },
+    ],
+    color: '#5C4033', icon: '🐗', aggressive: true, chaseRange: 5, attackRange: 1, attackSpeed: 1600,
+  },
+  stone_golem: {
+    id: 'stone_golem', name: 'Stone Golem', health: 300, maxHealth: 300, attack: 35, defense: 30, speed: 1.5, experience: 150,
+    lootTable: [
+      { itemId: 'gold_coin', chance: 1, minQuantity: 30, maxQuantity: 80 },
+      { itemId: 'iron_shield', chance: 0.08, minQuantity: 1, maxQuantity: 1 },
+      { itemId: 'plate_armor', chance: 0.05, minQuantity: 1, maxQuantity: 1 },
+      { itemId: 'golem_core', chance: 0.15, minQuantity: 1, maxQuantity: 1 },
+    ],
+    color: '#696969', icon: '🗿', aggressive: false, chaseRange: 3, attackRange: 1, attackSpeed: 3000,
+  },
+  ghost: {
+    id: 'ghost', name: 'Ghost', health: 50, maxHealth: 50, attack: 25, defense: 5, speed: 3, experience: 60,
+    lootTable: [
+      { itemId: 'gold_coin', chance: 0.8, minQuantity: 5, maxQuantity: 20 },
+      { itemId: 'mana_potion_medium', chance: 0.2, minQuantity: 1, maxQuantity: 1 },
+      { itemId: 'amulet_of_wisdom', chance: 0.03, minQuantity: 1, maxQuantity: 1 },
+      { itemId: 'ghost_essence', chance: 0.3, minQuantity: 1, maxQuantity: 2 },
+    ],
+    color: '#B0C4DE', icon: '👻', aggressive: true, chaseRange: 7, attackRange: 1, attackSpeed: 1800,
+  },
+  thornback: {
+    id: 'thornback', name: 'Thornback Tortoise', health: 120, maxHealth: 120, attack: 10, defense: 35, speed: 1.5, experience: 65,
+    lootTable: [
+      { itemId: 'gold_coin', chance: 1, minQuantity: 8, maxQuantity: 25 },
+      { itemId: 'crocodile_skin', chance: 0.15, minQuantity: 1, maxQuantity: 2 },
+      { itemId: 'health_potion_medium', chance: 0.15, minQuantity: 1, maxQuantity: 1 },
+      { itemId: 'tortoise_shell', chance: 0.3, minQuantity: 1, maxQuantity: 1 },
+    ],
+    color: '#556B2F', icon: '🐢', aggressive: false, chaseRange: 2, attackRange: 1, attackSpeed: 2500,
+  },
+  eagle: {
+    id: 'eagle', name: 'Mountain Eagle', health: 55, maxHealth: 55, attack: 22, defense: 6, speed: 6, experience: 50,
+    lootTable: [
+      { itemId: 'gold_coin', chance: 0.9, minQuantity: 5, maxQuantity: 18 },
+      { itemId: 'feather', chance: 0.5, minQuantity: 1, maxQuantity: 4 },
+      { itemId: 'health_potion_small', chance: 0.15, minQuantity: 1, maxQuantity: 1 },
+      { itemId: 'eagle_talon', chance: 0.3, minQuantity: 1, maxQuantity: 2 },
+    ],
+    color: '#4A3728', icon: '🦅', aggressive: true, chaseRange: 8, attackRange: 1, attackSpeed: 1000,
   },
 };
 

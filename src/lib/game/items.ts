@@ -1299,6 +1299,170 @@ export const ITEMS: Record<string, ItemDefinition> = {
     color: '#ffd700',
     icon: '🪙',
   },
+
+  // === NEW CRAFTING MATERIALS ===
+  raw_meat: {
+    id: 'raw_meat', name: 'Raw Meat', type: ItemType.CONSUMABLE, rarity: Rarity.COMMON,
+    description: 'Raw meat from a hunted animal. Can be eaten for a small heal.',
+    weight: 1.5, healAmount: 25, levelReq: 1, stackable: true, sellPrice: 2, buyPrice: 5,
+    color: '#8B0000', icon: '🥩',
+  },
+  bear_pelt: {
+    id: 'bear_pelt', name: 'Bear Pelt', type: ItemType.CONSUMABLE, rarity: Rarity.UNCOMMON,
+    description: 'A thick bear pelt. Sells for a good price.',
+    weight: 3, levelReq: 1, stackable: true, sellPrice: 50, buyPrice: 0,
+    color: '#5C3317', icon: '🧶',
+  },
+  crocodile_skin: {
+    id: 'crocodile_skin', name: 'Crocodile Skin', type: ItemType.CONSUMABLE, rarity: Rarity.UNCOMMON,
+    description: 'Tough crocodile hide. Valuable to merchants.',
+    weight: 2.5, levelReq: 1, stackable: true, sellPrice: 40, buyPrice: 0,
+    color: '#2E5A1E', icon: '🪶',
+  },
+  feather: {
+    id: 'feather', name: 'Feather', type: ItemType.CONSUMABLE, rarity: Rarity.COMMON,
+    description: 'A large bird feather. Used in crafting.',
+    weight: 0.1, levelReq: 1, stackable: true, sellPrice: 3, buyPrice: 0,
+    color: '#D2B48C', icon: '🪶',
+  },
+  crab_claw: {
+    id: 'crab_claw', name: 'Crab Claw', type: ItemType.CONSUMABLE, rarity: Rarity.COMMON,
+    description: 'A sharp crab claw. Can be used as a weapon or sold.',
+    weight: 0.8, attack: 5, levelReq: 1, stackable: true, sellPrice: 8, buyPrice: 0,
+    color: '#B22222', icon: '🦀',
+  },
+  minotaur_horn: {
+    id: 'minotaur_horn', name: 'Minotaur Horn', type: ItemType.CONSUMABLE, rarity: Rarity.RARE,
+    description: 'A fearsome minotaur horn. Highly valued.',
+    weight: 2, levelReq: 1, stackable: true, sellPrice: 80, buyPrice: 0,
+    color: '#DAA520', icon: '📯',
+  },
+  snake_venom: {
+    id: 'snake_venom', name: 'Snake Venom', type: ItemType.CONSUMABLE, rarity: Rarity.UNCOMMON,
+    description: 'Potent venom extracted from a cobra.',
+    weight: 0.3, levelReq: 1, stackable: true, sellPrice: 25, buyPrice: 0,
+    color: '#00ff00', icon: '毒素',
+  },
+
+  // === NEW EQUIPMENT ===
+  bone_sword: {
+    id: 'bone_sword', name: 'Bone Sword', type: ItemType.WEAPON, rarity: Rarity.COMMON,
+    description: 'A crude sword made from giant bones.', weight: 3, attack: 8, levelReq: 1,
+    stackable: false, sellPrice: 15, buyPrice: 35, color: '#E8DCC8', icon: '🗡️',
+  },
+  spiked_club: {
+    id: 'spiked_club', name: 'Spiked Club', type: ItemType.WEAPON, rarity: Rarity.UNCOMMON,
+    description: 'A heavy club with iron spikes.', weight: 5, attack: 14, levelReq: 3,
+    stackable: false, sellPrice: 30, buyPrice: 70, color: '#5A3A1A', icon: '🏏',
+  },
+  hunter_bow: {
+    id: 'hunter_bow', name: 'Hunter Bow', type: ItemType.WEAPON, rarity: Rarity.UNCOMMON,
+    description: 'A well-crafted bow for hunting.', weight: 2.5, attack: 12, levelReq: 5,
+    vocationReq: [Vocation.PALADIN], stackable: false, sellPrice: 45, buyPrice: 100, color: '#8B4513', icon: '🏹',
+  },
+  rune_blade: {
+    id: 'rune_blade', name: 'Rune Blade', type: ItemType.WEAPON, rarity: Rarity.EPIC,
+    description: 'A blade etched with ancient runes.', weight: 4, attack: 38, magicAttack: 10, levelReq: 15,
+    stackable: false, sellPrice: 800, buyPrice: 0, color: '#4169E1', icon: '⚔️',
+  },
+  tribal_shield: {
+    id: 'tribal_shield', name: 'Tribal Shield', type: ItemType.SHIELD, rarity: Rarity.COMMON,
+    description: 'A wooden shield with tribal markings.', weight: 4, defense: 6, levelReq: 1,
+    stackable: false, sellPrice: 20, buyPrice: 45, color: '#6B4226', icon: '🛡️',
+  },
+  iron_helm: {
+    id: 'iron_helm', name: 'Iron Helm', type: ItemType.HELMET, rarity: Rarity.UNCOMMON,
+    description: 'A sturdy iron helmet.', weight: 3, defense: 5, levelReq: 5,
+    stackable: false, sellPrice: 40, buyPrice: 90, color: '#6A6A6A', icon: '⛑️',
+  },
+  wolf_pelt_cloak: {
+    id: 'wolf_pelt_cloak', name: 'Wolf Pelt Cloak', type: ItemType.ARMOR, rarity: Rarity.UNCOMMON,
+    description: 'A warm cloak made from wolf pelts.', weight: 2, defense: 4, levelReq: 3,
+    stackable: false, sellPrice: 35, buyPrice: 80, color: '#6B6B6B', icon: '🧥',
+  },
+
+  // === TASK 5-6: NEW CRAFTING MATERIALS ===
+  golem_core: {
+    id: 'golem_core', name: 'Golem Core', type: ItemType.CONSUMABLE, rarity: Rarity.RARE,
+    description: 'A glowing crystal core from a stone golem.', weight: 2, levelReq: 1,
+    stackable: true, sellPrice: 150, buyPrice: 0, color: '#00CED1', icon: '💎',
+  },
+  ghost_essence: {
+    id: 'ghost_essence', name: 'Ghost Essence', type: ItemType.CONSUMABLE, rarity: Rarity.UNCOMMON,
+    description: 'Ectoplasm from a defeated ghost.', weight: 0.5, levelReq: 1,
+    stackable: true, sellPrice: 40, buyPrice: 0, color: '#B0C4DE', icon: '🫧',
+  },
+  eagle_talon: {
+    id: 'eagle_talon', name: 'Eagle Talon', type: ItemType.CONSUMABLE, rarity: Rarity.UNCOMMON,
+    description: 'Sharp talon from a mountain eagle.', weight: 0.3, levelReq: 1,
+    stackable: true, sellPrice: 25, buyPrice: 0, color: '#DAA520', icon: '🦴',
+  },
+  tortoise_shell: {
+    id: 'tortoise_shell', name: 'Tortoise Shell', type: ItemType.CONSUMABLE, rarity: Rarity.UNCOMMON,
+    description: 'Sturdy shell from a thornback.', weight: 3, levelReq: 1,
+    stackable: true, sellPrice: 35, buyPrice: 0, color: '#556B2F', icon: '🛡️',
+  },
+  war_wolf_fang: {
+    id: 'war_wolf_fang', name: 'War Wolf Fang', type: ItemType.CONSUMABLE, rarity: Rarity.RARE,
+    description: 'Sharp fang from a war wolf.', weight: 0.2, levelReq: 1,
+    stackable: true, sellPrice: 60, buyPrice: 0, color: '#FFFFFF', icon: '🦷',
+  },
+
+  // === TASK 5-6: NEW EQUIPMENT ===
+  war_hammer: {
+    id: 'war_hammer', name: 'War Hammer', type: ItemType.WEAPON, rarity: Rarity.RARE,
+    description: 'Crushes enemies with tremendous force.', weight: 8, attack: 38, levelReq: 20,
+    vocationReq: [Vocation.KNIGHT], stackable: false, sellPrice: 800, buyPrice: 2000,
+    color: '#708090', icon: '🔨',
+  },
+  frost_staff: {
+    id: 'frost_staff', name: 'Frost Staff', type: ItemType.WEAPON, rarity: Rarity.EPIC,
+    description: 'Channels ice magic.', weight: 4, magicAttack: 55, levelReq: 25,
+    vocationReq: [Vocation.SORCERER, Vocation.DRUID], stackable: false, sellPrice: 1500, buyPrice: 4000,
+    color: '#00BFFF', icon: '🪄',
+  },
+  hunting_crossbow: {
+    id: 'hunting_crossbow', name: 'Hunting Crossbow', type: ItemType.WEAPON, rarity: Rarity.UNCOMMON,
+    description: 'Fast and deadly.', weight: 5, attack: 22, levelReq: 12,
+    vocationReq: [Vocation.PALADIN], stackable: false, sellPrice: 300, buyPrice: 800,
+    color: '#8B4513', icon: '🏹',
+  },
+  shadow_cloak: {
+    id: 'shadow_cloak', name: 'Shadow Cloak', type: ItemType.ARMOR, rarity: Rarity.EPIC,
+    description: 'Makes you nearly invisible.', weight: 3, defense: 28, magicDefense: 20, levelReq: 30,
+    stackable: false, sellPrice: 2000, buyPrice: 5000, color: '#1a1a2e', icon: '🧥',
+  },
+  iron_gauntlets: {
+    id: 'iron_gauntlets', name: 'Iron Gauntlets', type: ItemType.ARMOR, rarity: Rarity.UNCOMMON,
+    description: 'Heavy but protective.', weight: 4, defense: 12, levelReq: 10,
+    vocationReq: [Vocation.KNIGHT, Vocation.PALADIN], stackable: false, sellPrice: 200, buyPrice: 500,
+    color: '#696969', icon: '🧤',
+  },
+  tortoise_shield: {
+    id: 'tortoise_shield', name: 'Tortoise Shield', type: ItemType.SHIELD, rarity: Rarity.RARE,
+    description: 'Incredible defense.', weight: 6, defense: 22, levelReq: 18,
+    stackable: false, sellPrice: 600, buyPrice: 1500, color: '#556B2F', icon: '🛡️',
+  },
+  wolf_helm: {
+    id: 'wolf_helm', name: 'Wolf Helm', type: ItemType.HELMET, rarity: Rarity.UNCOMMON,
+    description: 'Helm carved from a wolf\'s skull.', weight: 3, defense: 8, levelReq: 8,
+    stackable: false, sellPrice: 150, buyPrice: 400, color: '#696969', icon: '⛑️',
+  },
+  gemstone_ring: {
+    id: 'gemstone_ring', name: 'Gemstone Ring', type: ItemType.RING, rarity: Rarity.RARE,
+    description: 'Boosts magic attack.', weight: 0.1, magicAttack: 15, levelReq: 22,
+    stackable: false, sellPrice: 500, buyPrice: 1200, color: '#FF1493', icon: '💍',
+  },
+  mercenary_sword: {
+    id: 'mercenary_sword', name: 'Mercenary Sword', type: ItemType.WEAPON, rarity: Rarity.UNCOMMON,
+    description: 'Reliable blade.', weight: 5, attack: 20, levelReq: 10,
+    stackable: false, sellPrice: 250, buyPrice: 600, color: '#C0C0C0', icon: '⚔️',
+  },
+  spirit_amulet: {
+    id: 'spirit_amulet', name: 'Spirit Amulet', type: ItemType.AMULET, rarity: Rarity.RARE,
+    description: 'Protects against undead.', weight: 0.5, magicDefense: 18, levelReq: 20,
+    stackable: false, sellPrice: 400, buyPrice: 1000, color: '#9370DB', icon: '📿',
+  },
 };
 
 export function getItem(id: string): ItemDefinition | undefined {

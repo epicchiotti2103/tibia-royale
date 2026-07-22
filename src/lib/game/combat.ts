@@ -2,8 +2,9 @@
 // Tibia-Style Game - Combat System
 // =============================================
 
-import { PlayerStats, MonsterInstance, EquipSlot, InventoryItem, ItemType } from './types';
+import { PlayerStats, MonsterInstance, EquipSlot, InventoryItem, ItemType, LootDrop } from './types';
 import { ITEMS } from './items';
+import { MONSTERS } from './monsters';
 
 export interface CombatResult {
   damage: number;
@@ -71,7 +72,9 @@ export function playerAttackMonster(
   const critMultiplier = isCritical ? 2.0 : 1.0;
 
   // Damage formula: attack - (defense * 0.5) with variance
-  const defenseReduction = monster.defense * 0.4;
+  const monsterDef = MONSTERS[monster.definitionId];
+  const monsterDefense = monster.defense ?? monsterDef?.defense ?? 1;
+  const defenseReduction = monsterDefense * 0.4;
   const baseDamage = Math.max(1, totalAttack - defenseReduction);
   const variance = 0.8 + Math.random() * 0.4; // 80-120% variance
   const damage = Math.floor(baseDamage * variance * critMultiplier);
@@ -101,8 +104,11 @@ export function monsterAttackPlayer(
   const isCritical = Math.random() < 0.05; // 5% monster crit
   const critMultiplier = isCritical ? 1.5 : 1.0;
 
+  const monsterDef = MONSTERS[monster.definitionId];
+  const monsterAttack = monster.attack ?? monsterDef?.attack ?? 5;
+  const monsterDefense = monster.defense ?? monsterDef?.defense ?? 1;
   const defenseReduction = totalDefense * 0.4;
-  const baseDamage = Math.max(1, monster.defense > 0 ? monster.attack - defenseReduction : monster.attack);
+  const baseDamage = Math.max(1, monsterDefense > 0 ? monsterAttack - defenseReduction : monsterAttack);
   const variance = 0.8 + Math.random() * 0.4;
   const damage = Math.floor(Math.max(1, baseDamage) * variance * critMultiplier);
 
@@ -178,8 +184,9 @@ export function calculateLevelUpStats(
   return { leveledUp: true, newLevel, newExpToNext };
 }
 
-export function generateLoot(lootTable: MonsterInstance['lootTable']): { itemId: string; quantity: number }[] {
+export function generateLoot(lootTable?: LootDrop[]): { itemId: string; quantity: number }[] {
   const loot: { itemId: string; quantity: number }[] = [];
+  if (!lootTable) return loot;
 
   for (const drop of lootTable) {
     if (Math.random() < drop.chance) {

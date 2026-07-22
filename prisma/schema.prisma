@@ -27,8 +27,11 @@ model Player {
   positionX    Int      @default(50)
   positionY    Int      @default(47)
   gold         Int      @default(0)
+  direction    Int      @default(2)
   equipment    String   @default("{}")
   inventory    String   @default("[]")
+  skillUpgrades String  @default("{}")
+  equippedSkills String @default("[]")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

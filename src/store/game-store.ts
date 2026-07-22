@@ -18,11 +18,13 @@ import {
   GameMap,
   MonsterZone,
   DIR_OFFSETS,
+  DroppedLoot,
 } from '@/lib/game/types';
 import { calculateStats, VOCATION_STATS } from '@/lib/game/types';
 import { getGameMap } from '@/lib/game/tilemap';
 import { MONSTERS } from '@/lib/game/monsters';
 import { ITEMS } from '@/lib/game/items';
+import { BotInstance, generateBots } from '@/lib/game/bots';
 import {
   playerAttackMonster,
   monsterAttackPlayer,
@@ -33,11 +35,19 @@ import {
 import { getSkillsForVocation, getSkill, getSkillEffectType, MAX_EQUIPPED_SKILLS } from '@/lib/game/skills';
 
 export type GameScreen = 'login' | 'game' | 'dead';
+export type MatchPhase = 'hunting' | 'preparation' | 'arena' | 'ended';
 
 interface GameState {
   // Screen
   screen: GameScreen;
   setScreen: (screen: GameScreen) => void;
+
+  // Match State
+  matchPhase: MatchPhase;
+  matchTimeLeft: number; // in seconds
+  setMatchPhase: (phase: MatchPhase) => void;
+  updateMatchTimer: (deltaTime: number) => void;
+  resetMatch: () => void;
 
   // Player
   player: PlayerData | null;
@@ -46,16 +56,24 @@ interface GameState {
   // Game Map
   gameMap: GameMap;
 
-  // Monsters
+  // Monsters & Loot
   monsters: MonsterInstance[];
+  droppedLoot: DroppedLoot[];
   spawnMonsters: () => void;
   updateMonsters: (deltaTime: number) => void;
+  updateLoot: (deltaTime: number) => void;
 
   // Other Players (multiplayer)
   otherPlayers: OtherPlayer[];
   setOtherPlayers: (players: OtherPlayer[]) => void;
   updateOtherPlayer: (player: OtherPlayer) => void;
   removeOtherPlayer: (id: string) => void;
+
+  // Bots & Safezone
+  bots: BotInstance[];
+  spawnBots: (count: number) => void;
+  updateBots: (deltaTime: number) => void;
+  safeZoneRadius: number;
 
   // Movement
   movePlayer: (direction: Direction) => void;
@@ -81,9 +99,11 @@ interface GameState {
   skillUpgrades: Record<string, number>;
   upgradeSkill: (skillId: string) => void;
 
-  // Skill Management
+  // Skill & Inventory UI
   showSkillPanel: boolean;
   toggleSkillPanel: () => void;
+  showInventoryPanel: boolean;
+  toggleInventoryPanel: () => void;
   equippedSkillIds: string[];
   equipSkill: (skillId: string) => void;
   unequipSkill: (skillId: string) => void;
@@ -99,6 +119,7 @@ interface GameState {
   addToInventory: (itemId: string, quantity: number) => void;
   removeFromInventory: (invItemId: string, quantity: number) => void;
   consumeInventoryItem: (invItemId: string) => void;
+  quickUsePotion: () => void;
   equipItem: (invItemId: string) => void;
   unequipItem: (slot: EquipSlot) => void;
 
@@ -114,6 +135,13 @@ interface GameState {
 
   // Mana regeneration
   regenMana: (deltaTime: number) => void;
+
+  // Save / Load
+  savePlayer: () => Promise<void>;
+  loadPlayer: (name: string) => Promise<boolean>;
+  savedCharacterNames: string[];
+  fetchSavedCharacters: () => Promise<void>;
+  deleteCharacter: (name: string) => Promise<void>;
 }
 
 let monsterIdCounter = 0;
@@ -144,7 +172,147 @@ export const useGameStore = create<GameState>((set, get) => ({
   screen: 'login',
   setScreen: (screen) => set({ screen }),
 
-  player: null,
+  matchPhase: 'hunting',
+  matchTimeLeft: 180, // 3 minutes hunting phase
+  setMatchPhase: (phase) => set({ matchPhase: phase }),
+  updateMatchTimer: (deltaTime) => {
+    const { matchPhase, matchTimeLeft } = get();
+    if (matchPhase === 'ended') return;
+
+    // deltaTime is in ms. We decrement our seconds timer.
+    const newTime = matchTimeLeft - (deltaTime / 1000);
+    
+    if (newTime <= 0) {
+      if (matchPhase === 'hunting') {
+        const { player, bots } = get();
+        get().addChatMessage({ type: 'system', sender: 'System', content: '⏳ THE HUNT IS OVER! 40 SECONDS TO PREPARE!', color: '#3498db' });
+        
+        // Upgrade bots to match player's level dynamically
+        const playerLevel = player ? player.stats.level : 5;
+        const upgradedBots = bots.map(bot => {
+            const newLevel = Math.max(1, playerLevel + Math.floor(Math.random() * 5) - 2); // Level +/- 2 of player
+            const newStats = calculateStats(bot.vocation, newLevel);
+            return {
+                ...bot,
+                // Teleport bot to Arena with some scatter
+                position: { x: 50 + Math.floor(Math.random() * 12) - 6, y: 47 + Math.floor(Math.random() * 12) - 6 },
+                stats: {
+                    ...bot.stats, // Keep some base properties
+                    ...newStats,  // Apply scaled properties
+                    health: newStats.maxHealth,
+                    mana: newStats.maxMana,
+                }
+            };
+        });
+
+        set({ 
+          matchPhase: 'preparation', 
+          matchTimeLeft: 40, // 40s to buy from Merchant
+          monsters: [], // Clear all monsters for the final showdown
+          bots: upgradedBots,
+          player: player ? {
+            ...player,
+            // Teleport to the center of the Arena (Town) near the merchant
+            position: { x: 50 + Math.floor(Math.random() * 4) - 2, y: 47 + Math.floor(Math.random() * 4) - 2 },
+            // Full heal
+            stats: {
+              ...player.stats,
+              health: player.stats.maxHealth,
+              mana: player.stats.maxMana
+            }
+          } : null
+        });
+      } else if (matchPhase === 'preparation') {
+        const { player, bots, gameMap } = get();
+        get().addChatMessage({ type: 'system', sender: 'System', content: '⚔️ LET THE SLAUGHTER BEGIN! ⚔️', color: '#ff4444' });
+        
+        // Helper to find a non-blocking spawn across the ENTIRE map
+        const getRandomSpawn = () => {
+            let sx = 0, sy = 0, attempts = 0;
+            do {
+                sx = 5 + Math.floor(Math.random() * (gameMap.tiles[0].length - 10));
+                sy = 5 + Math.floor(Math.random() * (gameMap.tiles.length - 10));
+                attempts++;
+            } while (gameMap.tiles[sy][sx] !== 0 && gameMap.tiles[sy][sx] !== 1 && attempts < 50);
+            return { x: sx, y: sy };
+        };
+
+        const scatteredBots = bots.map(bot => ({
+            ...bot,
+            position: getRandomSpawn()
+        }));
+        
+        set({ 
+            matchPhase: 'arena', 
+            matchTimeLeft: 180, // Increased Arena time to 3 minutes because map is big
+            safeZoneRadius: 100, // Starts covering the whole map
+            bots: scatteredBots,
+            player: player ? {
+                ...player,
+                position: getRandomSpawn()
+            } : null
+        });
+      } else if (matchPhase === 'arena') {
+        get().addChatMessage({ type: 'system', sender: 'System', content: '🏁 MATCH ENDED (TIME LIMIT)! 🏁', color: '#f1c40f' });
+        set({ matchPhase: 'ended', matchTimeLeft: 0 });
+      }
+    } else {
+      set({ matchTimeLeft: newTime });
+      
+      // Check win condition and process safe zone during Arena
+      if (get().matchPhase === 'arena') {
+          const { player, bots, matchTimeLeft, addDamageNumber } = get();
+          const isPlayerAlive = player && player.stats.health > 0;
+          
+          if (isPlayerAlive && bots.length === 0) {
+              get().addChatMessage({ type: 'system', sender: 'System', content: '🏆 VICTORY! YOU ARE THE LAST ONE STANDING! 🏆', color: '#f1c40f' });
+              set({ matchPhase: 'ended', matchTimeLeft: 0 });
+          }
+
+          // Shrink Safe Zone logic (shrinks from 100 down to 0 over 180 seconds)
+          const newRadius = Math.max(0, (matchTimeLeft / 180) * 80);
+          set({ safeZoneRadius: newRadius });
+
+          // Damage entities outside safe zone (center of map is 50, 50)
+          const cx = 50;
+          const cy = 50;
+          
+          if (isPlayerAlive) {
+              const dist = Math.sqrt(Math.pow(player.position.x - cx, 2) + Math.pow(player.position.y - cy, 2));
+              if (dist > newRadius + 2) {
+                  // Real damage to player every tick (approx 3 damage per second)
+                  if (Math.random() < 0.02) {
+                      addDamageNumber(player.position, 5, 'damage');
+                      set(state => ({
+                          player: state.player ? {
+                              ...state.player,
+                              stats: { ...state.player.stats, health: state.player.stats.health - 5 }
+                          } : null
+                      }));
+                  }
+              }
+          }
+
+          // Damage bots outside safe zone
+          if (Math.random() < 0.02) {
+              const newBots = bots.map(b => {
+                  const dist = Math.sqrt(Math.pow(b.position.x - cx, 2) + Math.pow(b.position.y - cy, 2));
+                  if (dist > newRadius + 2) {
+                      addDamageNumber(b.position, 5, 'damage');
+                      return { ...b, stats: { ...b.stats, health: b.stats.health - 5 } };
+                  }
+                  return b;
+              });
+              set({ bots: newBots });
+          }
+      }
+    }
+  },
+  resetMatch: () => set({ matchPhase: 'hunting', matchTimeLeft: 180, safeZoneRadius: 100 }),
+
+  gameMap: getGameMap(),
+
+  safeZoneRadius: 100,
   createPlayer: (name, vocation) => {
     const map = getGameMap();
     const stats = calculateStats(vocation, 1);
@@ -171,6 +339,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       ],
       gold: 50,
     };
+    
+    // Spawn 10 bots at start
+    get().spawnBots(10);
+    
     set({ player, screen: 'game', equippedSkillIds: getSkillsForVocation(vocation).slice(0, 3).map(s => s.id) });
     get().addChatMessage({
       type: 'system',
@@ -183,19 +355,24 @@ export const useGameStore = create<GameState>((set, get) => ({
   gameMap: getGameMap(),
 
   monsters: [],
+  droppedLoot: [],
   spawnMonsters: () => {
     const map = get().gameMap;
     const monsters: MonsterInstance[] = [];
-
+    
     for (const zone of map.monsterZones) {
       for (let i = 0; i < zone.maxMonsters; i++) {
         const monsterDefId = zone.monsterIds[Math.floor(Math.random() * zone.monsterIds.length)];
         const def = MONSTERS[monsterDefId];
         if (!def) continue;
 
-        // Find valid spawn position
         let spawnX = 0, spawnY = 0;
         let attempts = 0;
+        const isPositionBlocked = (x: number, y: number, gameMap: any) => {
+           const tile = gameMap.tiles[y][x];
+           return tile === 2 /* WATER */ || tile === 5 /* WALL */ || tile === 10 /* ROCK */ || tile === 13 /* TREE */;
+        };
+
         do {
           spawnX = zone.area.x + Math.floor(Math.random() * zone.area.width);
           spawnY = zone.area.y + Math.floor(Math.random() * zone.area.height);
@@ -213,13 +390,146 @@ export const useGameStore = create<GameState>((set, get) => ({
             spawnPosition: { x: spawnX, y: spawnY },
             respawnTime: zone.spawnRate,
             isDead: false,
-            direction: Direction.SOUTH,
+            direction: 2, // SOUTH
           });
         }
       }
     }
-
     set({ monsters });
+  },
+
+  bots: [],
+  spawnBots: (count) => {
+    const map = get().gameMap;
+    const bots = generateBots(count, map.spawnPoint);
+    set({ bots });
+  },
+  
+  updateBots: (deltaTime) => {
+    const { bots, gameMap, player, matchPhase, addDamageNumber, addChatMessage } = get();
+    const now = Date.now();
+    
+    let updated = false;
+    const botDamageMap = new Map<string, number>();
+
+    const newBots = bots.map(bot => {
+      if (now - bot.lastActionTime < 1000 / bot.stats.speed) return bot;
+      
+      updated = true;
+      let newBot = { ...bot, lastActionTime: now };
+      
+      if (matchPhase === 'arena') {
+        // AI: First, check if bot is outside safe zone, if so, RUN TO CENTER!
+        const { safeZoneRadius } = get();
+        const distToCenter = Math.sqrt(Math.pow(bot.position.x - 50, 2) + Math.pow(bot.position.y - 50, 2));
+        
+        if (distToCenter > safeZoneRadius) {
+            // Run to center
+            if (Math.random() < 0.008 * deltaTime) { // Faster when escaping storm
+                const dx = Math.sign(50 - bot.position.x);
+                const dy = Math.sign(50 - bot.position.y);
+                newBot.position = { x: bot.position.x + dx, y: bot.position.y + dy };
+            }
+        } else {
+            // Find closest target (player or another bot)
+            let closestTarget: { id: string, x: number, y: number, type: 'player' | 'bot' } | null = null;
+            let minDistance = Infinity;
+
+            if (player && player.stats.health > 0) {
+               const dist = Math.abs(player.position.x - bot.position.x) + Math.abs(player.position.y - bot.position.y);
+               closestTarget = { id: 'player', x: player.position.x, y: player.position.y, type: 'player' };
+               minDistance = dist;
+            }
+
+            for (const otherBot of bots) {
+               if (otherBot.id === bot.id) continue;
+               const dist = Math.abs(otherBot.position.x - bot.position.x) + Math.abs(otherBot.position.y - bot.position.y);
+               if (dist < minDistance) {
+                   minDistance = dist;
+                   closestTarget = { id: otherBot.id, x: otherBot.position.x, y: otherBot.position.y, type: 'bot' };
+               }
+            }
+
+            if (closestTarget) {
+                const dx = Math.sign(closestTarget.x - bot.position.x);
+                const dy = Math.sign(closestTarget.y - bot.position.y);
+                
+                if (minDistance > 1) {
+                    // Throttle chase speed! (Approx 5 tiles per second)
+                    if (Math.random() < 0.005 * deltaTime) {
+                        newBot.position = { x: bot.position.x + dx, y: bot.position.y + dy };
+                    }
+                } else {
+                    if (closestTarget.type === 'player') {
+                        addDamageNumber(player!.position, bot.stats.attack, 'damage');
+                        // Apply player damage
+                        set(s => ({ player: s.player ? { ...s.player, stats: { ...s.player.stats, health: s.player.stats.health - bot.stats.attack } } : null }));
+                    } else {
+                        addDamageNumber({ x: closestTarget.x, y: closestTarget.y }, bot.stats.attack, 'damage');
+                        botDamageMap.set(closestTarget.id, (botDamageMap.get(closestTarget.id) || 0) + bot.stats.attack);
+                    }
+                }
+            }
+        }
+      } else {
+        // Random wandering during Hunting Phase
+        if (Math.random() < 0.002 * deltaTime) {
+            const dirs = [
+              { x: 1, y: 0, dir: 1 },
+              { x: -1, y: 0, dir: 3 },
+              { x: 0, y: 1, dir: 2 },
+              { x: 0, y: -1, dir: 0 }
+            ];
+            const move = dirs[Math.floor(Math.random() * dirs.length)];
+            const nx = bot.position.x + move.x;
+            const ny = bot.position.y + move.y;
+            
+            if (nx >= 0 && nx < gameMap.tiles[0].length && ny >= 0 && ny < gameMap.tiles.length) {
+                if (gameMap.tiles[ny][nx] !== 1) { // 1 is water/blocking for now
+                    newBot.position = { x: nx, y: ny };
+                    newBot.direction = move.dir;
+                }
+            }
+        }
+      }
+      return newBot;
+    });
+
+    if (updated || botDamageMap.size > 0) {
+        // Apply damage to bots
+        const finalBots = newBots.map(b => {
+            const dmg = botDamageMap.get(b.id);
+            if (dmg) {
+                b.stats.health -= dmg;
+            }
+            return b;
+        }).filter(b => {
+            if (b.stats.health <= 0) {
+                addChatMessage({ type: 'system', sender: 'System', content: `☠️ ${b.name} was eliminated!`, color: '#e74c3c' });
+                // Bot drops a mega chest on death!
+                const newDrops: DroppedLoot[] = [
+                    { id: `loot_${Date.now()}_1`, position: { ...b.position }, itemId: 'health_potion_large', quantity: 3, expiresAt: Date.now() + 60000 },
+                    { id: `loot_${Date.now()}_2`, position: { ...b.position }, itemId: 'gold_coin', quantity: 200, expiresAt: Date.now() + 60000 }
+                ];
+                set(s => ({ droppedLoot: [...s.droppedLoot, ...newDrops] }));
+                return false;
+            }
+            return true;
+        });
+
+        set({ bots: finalBots });
+    }
+  },
+
+  updateLoot: (deltaTime: number) => {
+    const now = Date.now();
+    set(state => {
+      const remainingLoot = state.droppedLoot.filter(l => l.expiresAt > now);
+      if (remainingLoot.length !== state.droppedLoot.length) {
+        return { droppedLoot: remainingLoot };
+      }
+      return state;
+    });
   },
 
   updateMonsters: (deltaTime) => {
@@ -268,46 +578,50 @@ export const useGameStore = create<GameState>((set, get) => ({
         if (isInTown(monster.position.x, monster.position.y)) {
           monster.targetId = undefined;
           // Move towards spawn position
-          const sdx = monster.spawnPosition.x - monster.position.x;
-          const sdy = monster.spawnPosition.y - monster.position.y;
-          if (Math.abs(sdx) > 0 || Math.abs(sdy) > 0) {
-            const retX = sdx > 0 ? 1 : sdx < 0 ? -1 : 0;
-            const retY = sdy > 0 ? 1 : sdy < 0 ? -1 : 0;
-            const rX = monster.position.x + retX;
-            const rY = monster.position.y + retY;
-            if (!isPositionBlocked(rX, rY, gameMap)) {
-              monster.position = { x: rX, y: rY };
-              if (retX > 0) monster.direction = Direction.EAST;
-              else if (retX < 0) monster.direction = Direction.WEST;
-              else if (retY > 0) monster.direction = Direction.SOUTH;
-              else if (retY < 0) monster.direction = Direction.NORTH;
-            }
+          if (Math.random() < 0.005 * deltaTime) {
+              const sdx = monster.spawnPosition.x - monster.position.x;
+              const sdy = monster.spawnPosition.y - monster.position.y;
+              if (Math.abs(sdx) > 0 || Math.abs(sdy) > 0) {
+                const retX = sdx > 0 ? 1 : sdx < 0 ? -1 : 0;
+                const retY = sdy > 0 ? 1 : sdy < 0 ? -1 : 0;
+                const rX = monster.position.x + retX;
+                const rY = monster.position.y + retY;
+                if (!isPositionBlocked(rX, rY, gameMap)) {
+                  monster.position = { x: rX, y: rY };
+                  if (retX > 0) monster.direction = Direction.EAST;
+                  else if (retX < 0) monster.direction = Direction.WEST;
+                  else if (retY > 0) monster.direction = Direction.SOUTH;
+                  else if (retY < 0) monster.direction = Direction.NORTH;
+                }
+              }
           }
           return { ...monster };
         }
 
         if (dist > def.attackRange) {
           // Move towards player
-          const moveX = dx > 0 ? 1 : dx < 0 ? -1 : 0;
-          const moveY = dy > 0 ? 1 : dy < 0 ? -1 : 0;
+          if (Math.random() < 0.004 * deltaTime) { // Throttle chase speed
+              const moveX = dx > 0 ? 1 : dx < 0 ? -1 : 0;
+              const moveY = dy > 0 ? 1 : dy < 0 ? -1 : 0;
 
-          // Update direction based on movement
-          if (moveX > 0) monster.direction = Direction.EAST;
-          else if (moveX < 0) monster.direction = Direction.WEST;
-          else if (moveY > 0) monster.direction = Direction.SOUTH;
-          else if (moveY < 0) monster.direction = Direction.NORTH;
+              // Update direction based on movement
+              if (moveX > 0) monster.direction = Direction.EAST;
+              else if (moveX < 0) monster.direction = Direction.WEST;
+              else if (moveY > 0) monster.direction = Direction.SOUTH;
+              else if (moveY < 0) monster.direction = Direction.NORTH;
 
-          // Try to move
-          let newX = monster.position.x + moveX;
-          let newY = monster.position.y + moveY;
+              // Try to move
+              let newX = monster.position.x + moveX;
+              let newY = monster.position.y + moveY;
 
-          // Simple collision avoidance
-          if (!isPositionBlocked(newX, newY, gameMap) && !isMonsterAt(newX, newY, monsters, monster.id) && !isInTown(newX, newY)) {
-            monster.position = { x: newX, y: newY };
-          } else if (moveX !== 0 && !isPositionBlocked(newX, monster.position.y, gameMap) && !isInTown(newX, monster.position.y)) {
-            monster.position = { x: newX, y: monster.position.y };
-          } else if (moveY !== 0 && !isPositionBlocked(monster.position.x, newY, gameMap) && !isInTown(monster.position.x, newY)) {
-            monster.position = { x: monster.position.x, y: newY };
+              // Simple collision avoidance
+              if (!isPositionBlocked(newX, newY, gameMap) && !isMonsterAt(newX, newY, monsters, monster.id) && !isInTown(newX, newY)) {
+                monster.position = { x: newX, y: newY };
+              } else if (moveX !== 0 && !isPositionBlocked(newX, monster.position.y, gameMap) && !isInTown(newX, monster.position.y)) {
+                monster.position = { x: newX, y: monster.position.y };
+              } else if (moveY !== 0 && !isPositionBlocked(monster.position.x, newY, gameMap) && !isInTown(monster.position.x, newY)) {
+                monster.position = { x: monster.position.x, y: newY };
+              }
           }
         } else if (dist <= def.attackRange && now - monster.lastAttackTime > def.attackSpeed) {
           // Attack player
@@ -433,13 +747,37 @@ export const useGameStore = create<GameState>((set, get) => ({
         direction,
       } : null,
     }));
+    
+    // Pick up loot if standing on it
+    const stateAfterMove = get();
+    const lootAtPos = stateAfterMove.droppedLoot.filter(l => l.position.x === newX && l.position.y === newY);
+    if (lootAtPos.length > 0) {
+      let lootMsg = 'Picked up: ';
+      const { addToInventory, addChatMessage } = stateAfterMove;
+      
+      for (const loot of lootAtPos) {
+        if (loot.itemId === 'gold_coin') {
+          set(s => ({ player: s.player ? { ...s.player, gold: s.player.gold + loot.quantity } : null }));
+          lootMsg += `${loot.quantity} gold, `;
+        } else {
+          addToInventory(loot.itemId, loot.quantity);
+          const itemDef = ITEMS[loot.itemId];
+          if (itemDef) lootMsg += `${itemDef.name} x${loot.quantity}, `;
+        }
+      }
+      
+      addChatMessage({ type: 'system', sender: 'Loot', content: lootMsg.slice(0, -2), color: '#2ecc71' });
+      
+      const pickedUpIds = new Set(lootAtPos.map(l => l.id));
+      set(s => ({ droppedLoot: s.droppedLoot.filter(l => !pickedUpIds.has(l.id)) }));
+    }
   },
 
   attackMonster: () => {
-    const { player, monsters, addDamageNumber, addChatMessage, addToInventory } = get();
+    const { player, monsters, bots, addDamageNumber, addChatMessage, addToInventory } = get();
     if (!player) return;
 
-    // Find monster in front of player
+    // Find target in front of player
     const dx = player.direction === Direction.EAST ? 1 : player.direction === Direction.WEST ? -1 : 0;
     const dy = player.direction === Direction.SOUTH ? 1 : player.direction === Direction.NORTH ? -1 : 0;
     const targetX = player.position.x + dx;
@@ -449,17 +787,23 @@ export const useGameStore = create<GameState>((set, get) => ({
     let targetMonster = monsters.find(m =>
       !m.isDead && m.position.x === targetX && m.position.y === targetY
     );
+    let targetBot = bots.find(b => b.stats.health > 0 && b.position.x === targetX && b.position.y === targetY);
 
-    // If no monster in front, check all adjacent
-    if (!targetMonster) {
+    // If no target in front, check all adjacent
+    if (!targetMonster && !targetBot) {
       targetMonster = monsters.find(m =>
         !m.isDead &&
         Math.abs(m.position.x - player.position.x) <= 1 &&
         Math.abs(m.position.y - player.position.y) <= 1
       );
+      targetBot = bots.find(b =>
+        b.stats.health > 0 &&
+        Math.abs(b.position.x - player.position.x) <= 1 &&
+        Math.abs(b.position.y - player.position.y) <= 1
+      );
     }
 
-    if (!targetMonster) {
+    if (!targetMonster && !targetBot) {
       // Show sword slash even if no target
       get().addSpellEffect({
         type: 'sword_slash',
@@ -471,6 +815,83 @@ export const useGameStore = create<GameState>((set, get) => ({
       });
       return;
     }
+
+    // Mark combat time
+    get().setLastCombatTime(Date.now());
+
+    // Attack BOT logic
+    if (targetBot) {
+      const result = playerAttackMonster(player.stats, player.equipment, {
+        attack: targetBot.stats.attack,
+        defense: targetBot.stats.defense,
+      } as any);
+
+      get().addSpellEffect({
+        type: 'sword_slash',
+        position: { ...player.position },
+        direction: player.direction,
+        color: result.isCritical ? '#ff4444' : '#c0c0c0',
+        startTime: Date.now(),
+        duration: 300,
+      });
+
+      if (result.isMiss) {
+        addDamageNumber(targetBot.position, 0, 'miss');
+      } else {
+        const prefix = result.isCritical ? '💥 ' : '';
+        addDamageNumber(targetBot.position, -result.damage, 'damage');
+        addChatMessage({ type: 'combat', sender: 'Combat', content: `${prefix}You hit ${targetBot.name} for ${result.damage}!`, color: result.isCritical ? '#e74c3c' : '#e67e22' });
+        
+        // Update Bot Health manually here
+        set(state => {
+           const newBots = state.bots.map(b => {
+               if (b.id === targetBot!.id) {
+                   return { ...b, stats: { ...b.stats, health: b.stats.health - result.damage }};
+               }
+               return b;
+           });
+           
+           // If bot dies to player, give player massive XP!
+           const deadBot = newBots.find(b => b.id === targetBot!.id);
+           if (deadBot && deadBot.stats.health <= 0) {
+               addChatMessage({ type: 'system', sender: 'System', content: `🔥 You ELIMINATED ${deadBot.name}! +1000 XP!`, color: '#f1c40f' });
+               
+               // XP logic
+               if (state.player) {
+                   const newExp = state.player.stats.experience + 1000;
+                   const { leveledUp, newLevel, newExpToNext } = calculateLevelUpStats(
+                     state.player.stats.level,
+                     newExp,
+                     state.player.stats.experienceToNext
+                   );
+
+                   // Also drop loot (updateBots filter will catch the death and drop loot too, so we just let updateBots handle the drop next frame!)
+                   // Wait, updateBots filter won't grant XP to player.
+                   
+                   let playerUpdates: any = {
+                       stats: {
+                           ...state.player.stats,
+                           experience: newExp,
+                           experienceToNext: newExpToNext,
+                       }
+                   };
+                   
+                   if (leveledUp) {
+                       const newStats = calculateStats(state.player.vocation, newLevel);
+                       playerUpdates.stats = { ...newStats, experience: newExp, experienceToNext: newExpToNext };
+                       addChatMessage({ type: 'system', sender: 'Level Up!', content: `🎉 Level ${newLevel}!`, color: '#f1c40f' });
+                   }
+
+                   return { bots: newBots, player: { ...state.player, ...playerUpdates } };
+               }
+           }
+           return { bots: newBots };
+        });
+      }
+      return;
+    }
+
+    // Existing Monster Logic below
 
     const def = MONSTERS[targetMonster.definitionId];
     if (!def) return;
@@ -528,21 +949,18 @@ export const useGameStore = create<GameState>((set, get) => ({
 
         // Generate loot
         const loot = generateLoot(def.lootTable);
-        let lootMsg = 'Loot: ';
-        for (const drop of loot) {
-          if (drop.itemId === 'gold_coin') {
-            set(state => ({
-              player: state.player ? { ...state.player, gold: state.player.gold + drop.quantity } : null,
-            }));
-            lootMsg += `${drop.quantity} gold, `;
-          } else {
-            addToInventory(drop.itemId, drop.quantity);
-            const itemDef = ITEMS[drop.itemId];
-            if (itemDef) lootMsg += `${itemDef.name} x${drop.quantity}, `;
-          }
-        }
         if (loot.length > 0) {
-          addChatMessage({ type: 'combat', sender: 'Loot', content: lootMsg.slice(0, -2), color: '#2ecc71' });
+          const newDrops: DroppedLoot[] = [];
+          for (const drop of loot) {
+            newDrops.push({
+              id: `loot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              position: { ...targetMonster.position },
+              itemId: drop.itemId,
+              quantity: drop.quantity,
+              expiresAt: Date.now() + 30000, // Disappears after 30 seconds
+            });
+          }
+          set(state => ({ droppedLoot: [...state.droppedLoot, ...newDrops] }));
         }
 
         // Update XP
@@ -672,6 +1090,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   setLastCombatTime: (time) => set({ lastCombatTime: time }),
   showSkillPanel: false,
   toggleSkillPanel: () => set((s) => ({ showSkillPanel: !s.showSkillPanel })),
+  showInventoryPanel: false,
+  toggleInventoryPanel: () => set((s) => ({ showInventoryPanel: !s.showInventoryPanel })),
   equippedSkillIds: [],
   equipSkill: (skillId) => {
     const { player, equippedSkillIds, addChatMessage } = get();
@@ -779,19 +1199,20 @@ export const useGameStore = create<GameState>((set, get) => ({
     // Attack spells - find target
     const dirOffset = DIR_OFFSETS[player.direction];
     let targetMonster: MonsterInstance | undefined;
+    let targetBot: BotInstance | undefined;
+    const { bots } = get();
 
     if (skill.range <= 1) {
       // Melee - check in front first, then adjacent
-      targetMonster = monsters.find(m =>
-        !m.isDead && m.position.x === player.position.x + dirOffset.x && m.position.y === player.position.y + dirOffset.y
-      );
-      if (!targetMonster) {
-        targetMonster = monsters.find(m =>
-          !m.isDead && Math.abs(m.position.x - player.position.x) <= 1 && Math.abs(m.position.y - player.position.y) <= 1
-        );
+      targetMonster = monsters.find(m => !m.isDead && m.position.x === player.position.x + dirOffset.x && m.position.y === player.position.y + dirOffset.y);
+      targetBot = bots.find(b => b.stats.health > 0 && b.position.x === player.position.x + dirOffset.x && b.position.y === player.position.y + dirOffset.y);
+      
+      if (!targetMonster && !targetBot) {
+        targetMonster = monsters.find(m => !m.isDead && Math.abs(m.position.x - player.position.x) <= 1 && Math.abs(m.position.y - player.position.y) <= 1);
+        targetBot = bots.find(b => b.stats.health > 0 && Math.abs(b.position.x - player.position.x) <= 1 && Math.abs(b.position.y - player.position.y) <= 1);
       }
     } else {
-      // Ranged - find closest monster in direction, up to range
+      // Ranged - find closest target in direction, up to range
       let closestDist = Infinity;
       for (const m of monsters) {
         if (m.isDead) continue;
@@ -799,18 +1220,25 @@ export const useGameStore = create<GameState>((set, get) => ({
         const dy = m.position.y - player.position.y;
         const dist = Math.max(Math.abs(dx), Math.abs(dy));
         if (dist > skill.range) continue;
-        // Check if monster is roughly in the direction the player faces
         const dotProduct = dx * dirOffset.x + dy * dirOffset.y;
-        if (dotProduct > 0 || dist <= 2) { // Allow some leeway
-          if (dist < closestDist) {
-            closestDist = dist;
-            targetMonster = m;
-          }
+        if (dotProduct > 0 || dist <= 2) {
+          if (dist < closestDist) { closestDist = dist; targetMonster = m; }
+        }
+      }
+      for (const b of bots) {
+        if (b.stats.health <= 0) continue;
+        const dx = b.position.x - player.position.x;
+        const dy = b.position.y - player.position.y;
+        const dist = Math.max(Math.abs(dx), Math.abs(dy));
+        if (dist > skill.range) continue;
+        const dotProduct = dx * dirOffset.x + dy * dirOffset.y;
+        if (dotProduct > 0 || dist <= 2) {
+          if (dist < closestDist) { closestDist = dist; targetBot = b; targetMonster = undefined; }
         }
       }
     }
 
-    if (!targetMonster) {
+    if (!targetMonster && !targetBot) {
       // Show effect at the direction player faces even if no target
       const fx = player.position.x + dirOffset.x * Math.min(skill.range, 3);
       const fy = player.position.y + dirOffset.y * Math.min(skill.range, 3);
@@ -825,17 +1253,47 @@ export const useGameStore = create<GameState>((set, get) => ({
     const magicPower = player.stats.magicAttack + (skill.damage || 0) * 0.3;
     const variance = 0.8 + Math.random() * 0.4;
     let dmg = Math.floor(((skill.damage || 30) + magicPower * 0.5) * variance * buffBonus * upgradeDmgMult);
-    const def = MONSTERS[targetMonster.definitionId];
+    
+    // Apply damage to BOT
+    if (targetBot) {
+        dmg = Math.max(1, dmg - Math.floor(targetBot.stats.magicDefense * 0.3));
+        addDamageNumber(targetBot.position, -dmg, 'damage');
+        addSpellEffect({ type: effectType, position: player.position, direction: player.direction, targetPosition: { ...targetBot.position }, color: skill.color, startTime: now, duration: 600, size: skill.range, damage: dmg });
+        
+        set(state => {
+           const newBots = state.bots.map(b => b.id === targetBot!.id ? { ...b, stats: { ...b.stats, health: b.stats.health - dmg }} : b);
+           const deadBot = newBots.find(b => b.id === targetBot!.id);
+           if (deadBot && deadBot.stats.health <= 0) {
+               addChatMessage({ type: 'system', sender: 'System', content: `🔥 You ELIMINATED ${deadBot.name} with ${skill.name}! +1500 XP!`, color: '#f1c40f' });
+               if (state.player) {
+                   const newExp = state.player.stats.experience + 1500;
+                   const { leveledUp, newLevel, newExpToNext } = calculateLevelUpStats(state.player.stats.level, newExp, state.player.stats.experienceToNext);
+                   let playerUpdates: any = { stats: { ...state.player.stats, experience: newExp, experienceToNext: newExpToNext } };
+                   if (leveledUp) {
+                       const newStats = calculateStats(state.player.vocation, newLevel);
+                       playerUpdates.stats = { ...newStats, experience: newExp, experienceToNext: newExpToNext };
+                       addChatMessage({ type: 'system', sender: 'Level Up!', content: `🎉 Level ${newLevel}!`, color: '#f1c40f' });
+                   }
+                   return { bots: newBots, player: { ...state.player, ...playerUpdates } };
+               }
+           }
+           return { bots: newBots };
+        });
+        return;
+    }
+
+    // Apply damage to MONSTER
+    const def = MONSTERS[targetMonster!.definitionId];
     if (def) dmg = Math.max(1, dmg - Math.floor(def.defense * 0.3));
 
-    addDamageNumber(targetMonster.position, -dmg, 'damage');
+    addDamageNumber(targetMonster!.position, -dmg, 'damage');
 
     // Visual effect
     addSpellEffect({
       type: effectType,
       position: player.position,
       direction: player.direction,
-      targetPosition: { ...targetMonster.position },
+      targetPosition: { ...targetMonster!.position },
       color: skill.color,
       startTime: now,
       duration: 600,
@@ -843,13 +1301,13 @@ export const useGameStore = create<GameState>((set, get) => ({
       damage: dmg,
     });
 
-    const newMonsterHealth = targetMonster.health - dmg;
+    const newMonsterHealth = targetMonster!.health - dmg;
 
     if (newMonsterHealth <= 0) {
       // Monster killed
       if (def) {
         addChatMessage({ type: 'combat', sender: 'Skill', content: `${skill.icon} ${skill.name} killed ${def.name}! +${def.experience} XP`, color: '#f1c40f' });
-        addDamageNumber(targetMonster.position, def.experience, 'xp');
+        addDamageNumber(targetMonster!.position, def.experience, 'xp');
 
         // Loot
         const loot = generateLoot(def.lootTable);
@@ -1010,6 +1468,22 @@ export const useGameStore = create<GameState>((set, get) => ({
     } else {
       addChatMessage({ type: 'system', sender: 'Item', content: result.message, color: '#e74c3c' });
     }
+  },
+
+  quickUsePotion: () => {
+    const { player, consumeInventoryItem } = get();
+    if (!player) return;
+
+    const needHP = player.stats.health < player.stats.maxHealth * 0.8;
+    const potions = player.inventory.filter(i =>
+      needHP ? i.itemId.startsWith('health_potion') : i.itemId.startsWith('mana_potion')
+    ).sort((a, b) => {
+      const order = needHP
+        ? ['health_potion_large', 'health_potion_medium', 'health_potion_small']
+        : ['mana_potion_large', 'mana_potion_medium', 'mana_potion_small'];
+      return order.indexOf(a.itemId) - order.indexOf(b.itemId);
+    });
+    if (potions.length > 0) consumeInventoryItem(potions[0].id);
   },
 
   equipItem: (invItemId) => {
@@ -1251,6 +1725,95 @@ export const useGameStore = create<GameState>((set, get) => ({
         },
       };
     });
+  },
+
+  // ---- Save / Load ----
+  savedCharacterNames: [],
+
+  savePlayer: async () => {
+    const state = get();
+    if (!state.player) return;
+    try {
+      await fetch('/api/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: state.player.name,
+          vocation: state.player.vocation,
+          position: state.player.position,
+          direction: state.player.direction,
+          stats: state.player.stats,
+          equipment: state.player.equipment,
+          inventory: state.player.inventory,
+          gold: state.player.gold,
+          skillUpgrades: state.skillUpgrades,
+          equippedSkills: state.equippedSkillIds,
+        }),
+      });
+    } catch (e) {
+      console.error('Save failed:', e);
+    }
+  },
+
+  loadPlayer: async (name: string) => {
+    try {
+      const res = await fetch(`/api/load?name=${encodeURIComponent(name)}`);
+      if (!res.ok) return false;
+      const data = await res.json();
+      const map = getGameMap();
+
+      const player: PlayerData = {
+        id: `player_${Date.now()}`,
+        name: data.name,
+        vocation: data.vocation as Vocation,
+        position: { x: data.position.x, y: data.position.y },
+        direction: data.direction as Direction,
+        stats: data.stats,
+        equipment: data.equipment,
+        inventory: data.inventory,
+        gold: data.gold,
+      };
+
+      set({
+        player,
+        screen: 'game',
+        equippedSkillIds: data.equippedSkills || [],
+        skillUpgrades: data.skillUpgrades || {},
+      });
+
+      get().spawnMonsters();
+      get().addChatMessage({
+        type: 'system',
+        sender: 'System',
+        content: `Welcome back, ${data.name} the ${data.vocation}! (Level ${data.stats.level})`,
+        color: '#f1c40f',
+      });
+      return true;
+    } catch (e) {
+      console.error('Load failed:', e);
+      return false;
+    }
+  },
+
+  fetchSavedCharacters: async () => {
+    try {
+      const res = await fetch('/api/characters');
+      if (res.ok) {
+        const chars = await res.json();
+        set({ savedCharacterNames: chars.map((c: { name: string }) => c.name) });
+      }
+    } catch (e) {
+      console.error('Fetch characters failed:', e);
+    }
+  },
+
+  deleteCharacter: async (name: string) => {
+    try {
+      await fetch(`/api/character?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
+      get().fetchSavedCharacters();
+    } catch (e) {
+      console.error('Delete failed:', e);
+    }
   },
 }));
 

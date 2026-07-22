@@ -2,6 +2,8 @@
 
 import React, { useEffect, useRef, useCallback } from 'react';
 import { useGameStore } from '@/store/game-store';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { MobileControls } from '@/components/game/MobileControls';
 import {
   TILE_SIZE,
   TileType,
@@ -11,8 +13,10 @@ import {
   SpellEffect,
   DIR_OFFSETS,
   MonsterSpriteSet,
+  Vocation,
 } from '@/lib/game/types';
 import { MONSTERS } from '@/lib/game/monsters';
+import { drawMonsterCreature } from '@/lib/game/monster-drawings';
 
 // =============================================
 // Sprite image cache
@@ -20,24 +24,50 @@ import { MONSTERS } from '@/lib/game/monsters';
 const spriteCache: Record<string, HTMLImageElement> = {};
 const spriteLoadPromises: Record<string, Promise<void>> = {};
 
-function loadSprite(url: string): Promise<HTMLImageElement> {
+function loadSprite(url: string): Promise<HTMLImageElement | undefined> {
   if (spriteCache[url]) return Promise.resolve(spriteCache[url]);
-  if (spriteLoadPromises[url]) {
-    return spriteLoadPromises[url].then(() => spriteCache[url]);
+  if (!spriteLoadPromises[url]) {
+    spriteLoadPromises[url] = new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        spriteCache[url] = img;
+        resolve();
+      };
+      img.onerror = () => {
+        resolve(); // Don't block on error
+      };
+      img.src = url;
+    });
   }
-  spriteLoadPromises[url] = new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      spriteCache[url] = img;
-      resolve();
-    };
-    img.onerror = () => {
-      resolve(); // Don't block on error
-    };
-    img.src = url;
-  });
-  return spriteLoadPromises[url];
+  return spriteLoadPromises[url].then(() => spriteCache[url]);
 }
+
+const PLAYER_SPRITES: Record<string, MonsterSpriteSet> = {
+  [Vocation.KNIGHT]: {
+    north: '/sprites/player_knight/north.png',
+    south: '/sprites/player_knight/south.png',
+    east: '/sprites/player_knight/east.png',
+    west: '/sprites/player_knight/west.png',
+  },
+  [Vocation.SORCERER]: {
+    north: '/sprites/player_sorcerer/north.png',
+    south: '/sprites/player_sorcerer/south.png',
+    east: '/sprites/player_sorcerer/east.png',
+    west: '/sprites/player_sorcerer/west.png',
+  },
+  [Vocation.DRUID]: {
+    north: '/sprites/player_druid/north.png',
+    south: '/sprites/player_druid/south.png',
+    east: '/sprites/player_druid/east.png',
+    west: '/sprites/player_druid/west.png',
+  },
+  [Vocation.PALADIN]: {
+    north: '/sprites/player_paladin/north.png',
+    south: '/sprites/player_paladin/south.png',
+    east: '/sprites/player_paladin/east.png',
+    west: '/sprites/player_paladin/west.png',
+  },
+};
 
 function preloadSprites() {
   for (const def of Object.values(MONSTERS)) {
@@ -47,6 +77,13 @@ function preloadSprites() {
       loadSprite(def.sprites.east);
       loadSprite(def.sprites.west);
     }
+  }
+  // Preload player vocation sprites
+  for (const sprites of Object.values(PLAYER_SPRITES)) {
+    loadSprite(sprites.north);
+    loadSprite(sprites.south);
+    loadSprite(sprites.east);
+    loadSprite(sprites.west);
   }
 }
 
@@ -60,7 +97,7 @@ function getSpriteForDirection(sprites: MonsterSpriteSet, direction: Direction):
   }
 }
 
-function getDirection(dx: number, dy: number): Direction {
+export function getDirection(dx: number, dy: number): Direction {
   if (Math.abs(dx) > Math.abs(dy)) {
     return dx > 0 ? Direction.EAST : Direction.WEST;
   }
@@ -68,120 +105,586 @@ function getDirection(dx: number, dy: number): Direction {
 }
 
 // =============================================
+// Pseudo-random tile hash (deterministic per tile)
+// =============================================
+function tileHash(x: number, y: number, seed: number = 0): number {
+  let h = (seed * 374761393 + x * 668265263 + y * 1274126177) | 0;
+  h = ((h ^ (h >> 13)) * 1103515245 + 12345) | 0;
+  h = h ^ (h >> 16);
+  return (h & 0x7fffffff) / 0x7fffffff;
+}
+
+// =============================================
 // Tile detail rendering
 // =============================================
-function drawTileDetail(ctx: CanvasRenderingContext2D, tile: TileType, x: number, y: number) {
+function drawTileDetail(ctx: CanvasRenderingContext2D, tile: TileType, screenX: number, screenY: number, tileX: number, tileY: number) {
   const ts = TILE_SIZE;
+  const cx = screenX + ts / 2;
+  const cy = screenY + ts / 2;
+  const time = Date.now() / 1000;
+
   switch (tile) {
     case TileType.GRASS: {
-      ctx.fillStyle = '#5a8c4f';
-      for (let i = 0; i < 3; i++) {
-        const gx = x + 5 + (i * 10) + Math.sin(x + y + i) * 3;
-        const gy = y + ts - 8 - (i * 4);
-        ctx.fillRect(gx, gy, 2, 6);
+      // Scattered grass blades using deterministic hash
+      const bladeCount = 6 + Math.floor(tileHash(tileX, tileY, 1) * 5);
+      for (let i = 0; i < bladeCount; i++) {
+        const bx = tileHash(tileX, tileY, i * 3 + 10);
+        const by = tileHash(tileX, tileY, i * 3 + 11);
+        const bh = tileHash(tileX, tileY, i * 3 + 12);
+        const gx = screenX + bx * (ts - 4) + 2;
+        const gy = screenY + by * (ts - 4) + 2;
+        const height = 3 + bh * 5;
+        // Darker green blade
+        ctx.fillStyle = `rgb(${30 + Math.floor(bx * 20)}, ${55 + Math.floor(by * 25)}, ${22 + Math.floor(bh * 15)})`;
+        ctx.fillRect(gx, gy - height, 1, height);
+      }
+      // Occasional small flowers
+      const flowerCount = Math.floor(tileHash(tileX, tileY, 50) * 3);
+      const flowerColors = ['#c4c020', '#d04030', '#d080d0', '#f0f0f0'];
+      for (let i = 0; i < flowerCount; i++) {
+        const fx = tileHash(tileX, tileY, i + 60);
+        const fy = tileHash(tileX, tileY, i + 70);
+        const fc = Math.floor(tileHash(tileX, tileY, i + 80) * flowerColors.length);
+        ctx.fillStyle = flowerColors[fc];
+        ctx.fillRect(screenX + fx * (ts - 6) + 3, screenY + fy * (ts - 6) + 3, 2, 2);
       }
       break;
     }
+
     case TileType.WATER: {
-      ctx.fillStyle = 'rgba(100,180,255,0.3)';
-      const time = Date.now() / 1000;
-      ctx.fillRect(x + 4 + Math.sin(time + x) * 2, y + 8, 8, 2);
-      ctx.fillRect(x + 16 + Math.cos(time + y) * 2, y + 20, 10, 2);
-      break;
-    }
-    case TileType.TREE: {
-      ctx.fillStyle = '#5a3a1a';
-      ctx.fillRect(x + ts / 2 - 2, y + ts / 2, 4, ts / 2);
-      ctx.fillStyle = '#1a6b0e';
-      ctx.beginPath();
-      ctx.arc(x + ts / 2, y + ts / 2 - 2, 10, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#228b1a';
-      ctx.beginPath();
-      ctx.arc(x + ts / 2 - 3, y + ts / 2 - 4, 6, 0, Math.PI * 2);
-      ctx.fill();
-      break;
-    }
-    case TileType.WALL: {
-      ctx.fillStyle = '#4a4a4a';
-      ctx.fillRect(x + 1, y + 1, ts - 2, ts - 2);
-      ctx.strokeStyle = '#3a3a3a';
+      // Darker grid pattern underneath
+      ctx.strokeStyle = 'rgba(0,20,50,0.3)';
       ctx.lineWidth = 1;
-      ctx.strokeRect(x + 1, y + 1, ts - 2, ts - 2);
       ctx.beginPath();
-      ctx.moveTo(x, y + ts / 2);
-      ctx.lineTo(x + ts, y + ts / 2);
+      ctx.moveTo(screenX, screenY + ts / 2);
+      ctx.lineTo(screenX + ts, screenY + ts / 2);
+      ctx.moveTo(screenX + ts / 2, screenY);
+      ctx.lineTo(screenX + ts / 2, screenY + ts);
       ctx.stroke();
+      // Animated wave lines with varying opacity
+      for (let i = 0; i < 3; i++) {
+        const waveY = screenY + 5 + i * 10;
+        const opacity = 0.15 + Math.sin(time * 1.5 + tileX + i * 2) * 0.1;
+        ctx.strokeStyle = `rgba(80,160,220,${opacity})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let wx = 0; wx < ts; wx += 2) {
+          const wy = waveY + Math.sin(time * 2 + wx * 0.3 + tileX * 3 + i) * 2;
+          if (wx === 0) ctx.moveTo(screenX + wx, wy);
+          else ctx.lineTo(screenX + wx, wy);
+        }
+        ctx.stroke();
+      }
+      // Subtle highlight
+      ctx.fillStyle = `rgba(120,200,255,${0.05 + Math.sin(time + tileY) * 0.03})`;
+      ctx.fillRect(screenX + 4, screenY + 4, ts - 8, 2);
       break;
     }
+
+    case TileType.TREE: {
+      // Shadow underneath
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.beginPath();
+      ctx.ellipse(cx + 2, cy + 6, 11, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Trunk
+      ctx.fillStyle = '#3a2210';
+      ctx.fillRect(cx - 2, cy + 1, 4, ts / 2 - 1);
+      ctx.fillStyle = '#4a3018';
+      ctx.fillRect(cx - 1, cy + 1, 2, ts / 2 - 1);
+      // Canopy - multiple overlapping circles for fullness
+      const canopyColors = ['#0a3a08', '#0e440c', '#0c3e0a', '#124e10', '#0b3c09'];
+      const offsets = [
+        [0, -4, 12], [-5, -1, 9], [5, -1, 9], [-3, -7, 8], [3, -7, 8],
+        [0, -2, 11], [-7, -4, 7], [7, -4, 7],
+      ];
+      for (let i = 0; i < offsets.length; i++) {
+        ctx.fillStyle = canopyColors[i % canopyColors.length];
+        ctx.beginPath();
+        ctx.arc(cx + offsets[i][0], cy + offsets[i][1], offsets[i][2], 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Highlight on top
+      ctx.fillStyle = 'rgba(40,120,30,0.3)';
+      ctx.beginPath();
+      ctx.arc(cx - 2, cy - 8, 5, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+
+    case TileType.WALL: {
+      // Stone brick pattern with mortar
+      const brickH = ts / 4;
+      const brickW = ts / 2;
+      // Mortar lines
+      ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+      ctx.lineWidth = 1;
+      for (let row = 0; row <= 4; row++) {
+        ctx.beginPath();
+        ctx.moveTo(screenX, screenY + row * brickH);
+        ctx.lineTo(screenX + ts, screenY + row * brickH);
+        ctx.stroke();
+        const offset = row % 2 === 0 ? 0 : brickW / 2;
+        for (let col = 0; col <= 2; col++) {
+          const bx = screenX + col * brickW + offset;
+          if (bx >= screenX && bx <= screenX + ts) {
+            ctx.beginPath();
+            ctx.moveTo(bx, screenY + row * brickH);
+            ctx.lineTo(bx, screenY + (row + 1) * brickH);
+            ctx.stroke();
+          }
+        }
+      }
+      // Subtle 3D shadow on bottom-right edges
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      ctx.fillRect(screenX + ts - 3, screenY, 3, ts);
+      ctx.fillRect(screenX, screenY + ts - 3, ts, 3);
+      // Top-left highlight
+      ctx.fillStyle = 'rgba(255,255,255,0.05)';
+      ctx.fillRect(screenX, screenY, 3, ts);
+      ctx.fillRect(screenX, screenY, ts, 3);
+      // Texture dots for stone grain
+      for (let i = 0; i < 5; i++) {
+        const dx = tileHash(tileX, tileY, i + 100);
+        const dy = tileHash(tileX, tileY, i + 110);
+        const shade = 30 + Math.floor(dx * 20);
+        ctx.fillStyle = `rgba(${shade},${shade},${shade},0.3)`;
+        ctx.fillRect(screenX + dx * (ts - 4) + 2, screenY + dy * (ts - 4) + 2, 2, 2);
+      }
+      break;
+    }
+
     case TileType.ROCK: {
-      ctx.fillStyle = '#555';
+      // Shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
       ctx.beginPath();
-      ctx.ellipse(x + ts / 2, y + ts / 2 + 2, 12, 8, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx + 2, cy + 4, 13, 8, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = '#666';
+      // Main boulder body
+      ctx.fillStyle = '#454545';
       ctx.beginPath();
-      ctx.ellipse(x + ts / 2, y + ts / 2, 10, 6, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx, cy + 1, 12, 9, 0, 0, Math.PI * 2);
       ctx.fill();
+      // Top-left highlight
+      ctx.fillStyle = 'rgba(180,180,180,0.2)';
+      ctx.beginPath();
+      ctx.ellipse(cx - 3, cy - 2, 7, 5, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+      // Bottom-right shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.beginPath();
+      ctx.ellipse(cx + 4, cy + 4, 8, 5, 0.3, 0, Math.PI * 2);
+      ctx.fill();
+      // Texture dots
+      for (let i = 0; i < 4; i++) {
+        const dx = tileHash(tileX, tileY, i + 200);
+        const dy = tileHash(tileX, tileY, i + 210);
+        ctx.fillStyle = i % 2 === 0 ? 'rgba(100,100,100,0.4)' : 'rgba(30,30,30,0.3)';
+        ctx.fillRect(screenX + 8 + dx * 16, screenY + 8 + dy * 16, 2, 2);
+      }
       break;
     }
+
     case TileType.LAVA: {
-      const time = Date.now() / 500;
-      ctx.fillStyle = `rgba(255, ${100 + Math.sin(time + x) * 50}, 0, 0.6)`;
-      ctx.fillRect(x, y, ts, ts);
-      ctx.fillStyle = `rgba(255, 200, 0, ${0.3 + Math.sin(time * 2 + y) * 0.2})`;
-      ctx.fillRect(x + 8 + Math.sin(time) * 3, y + 8, 8, 8);
+      // Darker cracks
+      ctx.strokeStyle = 'rgba(30,5,0,0.6)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(screenX + 4, screenY + 8);
+      ctx.lineTo(screenX + 14, screenY + 12);
+      ctx.lineTo(screenX + 20, screenY + 6);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(screenX + 10, screenY + 22);
+      ctx.lineTo(screenX + 22, screenY + 26);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(screenX + 2, screenY + 28);
+      ctx.lineTo(screenX + 12, screenY + 20);
+      ctx.stroke();
+      // Animated bright bubbles
+      for (let i = 0; i < 4; i++) {
+        const bx = tileHash(tileX, tileY, i + 300);
+        const by = tileHash(tileX, tileY, i + 310);
+        const phase = time * 2 + tileX + tileY + i * 1.5;
+        const pulse = 0.4 + Math.sin(phase) * 0.3;
+        const size = 3 + Math.sin(phase * 1.3) * 2;
+        // Orange glow
+        ctx.fillStyle = `rgba(255,${140 + Math.floor(Math.sin(phase) * 60)},0,${pulse * 0.5})`;
+        ctx.beginPath();
+        ctx.arc(screenX + 5 + bx * (ts - 10), screenY + 5 + by * (ts - 10), size + 2, 0, Math.PI * 2);
+        ctx.fill();
+        // Yellow hot center
+        ctx.fillStyle = `rgba(255,220,50,${pulse * 0.7})`;
+        ctx.beginPath();
+        ctx.arc(screenX + 5 + bx * (ts - 10), screenY + 5 + by * (ts - 10), size, 0, Math.PI * 2);
+        ctx.fill();
+      }
       break;
     }
+
     case TileType.BUSH: {
-      ctx.fillStyle = '#2a6a1e';
+      // Shadow underneath
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
       ctx.beginPath();
-      ctx.arc(x + ts / 2, y + ts / 2, 8, 0, Math.PI * 2);
+      ctx.ellipse(cx + 1, cy + 5, 11, 5, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = '#3a8a2e';
+      // Dark outer circles
+      const bushParts = [
+        [cx - 4, cy, 8],
+        [cx + 4, cy, 8],
+        [cx, cy - 3, 9],
+        [cx - 6, cy - 1, 6],
+        [cx + 6, cy - 1, 6],
+      ];
+      for (const [px, py, r] of bushParts) {
+        ctx.fillStyle = '#143a0e';
+        ctx.beginPath();
+        ctx.arc(px, py, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Lighter center
+      ctx.fillStyle = '#1e5a16';
       ctx.beginPath();
-      ctx.arc(x + ts / 2 + 3, y + ts / 2 - 2, 6, 0, Math.PI * 2);
+      ctx.arc(cx, cy - 1, 5, 0, Math.PI * 2);
       ctx.fill();
+      // Berry dots
+      for (let i = 0; i < 3; i++) {
+        const bx = tileHash(tileX, tileY, i + 400);
+        const by = tileHash(tileX, tileY, i + 410);
+        ctx.fillStyle = i === 0 ? '#a02020' : '#802040';
+        ctx.beginPath();
+        ctx.arc(screenX + 8 + bx * 16, screenY + 8 + by * 16, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
       break;
     }
+
     case TileType.BRIDGE: {
-      ctx.fillStyle = '#7a5914';
-      ctx.fillRect(x + 2, y, ts - 4, ts);
-      ctx.fillStyle = '#6a4904';
+      // Wooden planks
+      const plankW = (ts - 4) / 4;
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= 4; i++) {
+        ctx.beginPath();
+        ctx.moveTo(screenX + 2 + i * plankW, screenY);
+        ctx.lineTo(screenX + 2 + i * plankW, screenY + ts);
+        ctx.stroke();
+      }
+      // Wood grain lines on each plank
       for (let i = 0; i < 4; i++) {
-        ctx.fillRect(x + 2, y + i * 8, ts - 4, 1);
+        const grainX = screenX + 2 + i * plankW + plankW / 2;
+        ctx.strokeStyle = 'rgba(60,30,5,0.2)';
+        ctx.beginPath();
+        ctx.moveTo(grainX - 1, screenY + 2);
+        ctx.lineTo(grainX + 1, screenY + ts - 2);
+        ctx.stroke();
+      }
+      // Nail dots at intersections
+      ctx.fillStyle = '#2a1a08';
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 5; col++) {
+          ctx.beginPath();
+          ctx.arc(screenX + 2 + col * plankW, screenY + 4 + row * 10, 1, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
       break;
     }
+
     case TileType.DARK_GRASS: {
-      ctx.fillStyle = '#3a6a35';
-      for (let i = 0; i < 4; i++) {
-        const gx = x + 3 + (i * 7) + Math.sin(x + y + i) * 2;
-        const gy = y + ts - 6 - (i * 3);
-        ctx.fillRect(gx, gy, 1, 5);
+      // Scattered dark grass blades
+      const bladeCount = 8 + Math.floor(tileHash(tileX, tileY, 1) * 6);
+      for (let i = 0; i < bladeCount; i++) {
+        const bx = tileHash(tileX, tileY, i * 3 + 500);
+        const by = tileHash(tileX, tileY, i * 3 + 501);
+        const bh = tileHash(tileX, tileY, i * 3 + 502);
+        const gx = screenX + bx * (ts - 4) + 2;
+        const gy = screenY + by * (ts - 4) + 2;
+        const height = 2 + bh * 4;
+        ctx.fillStyle = `rgb(${15 + Math.floor(bx * 15)}, ${28 + Math.floor(by * 20)}, ${10 + Math.floor(bh * 10)})`;
+        ctx.fillRect(gx, gy - height, 1, height);
+      }
+      // Occasional dark mushroom dots
+      const mushroomCount = Math.floor(tileHash(tileX, tileY, 550) * 2);
+      for (let i = 0; i < mushroomCount; i++) {
+        const mx = tileHash(tileX, tileY, i + 560);
+        const my = tileHash(tileX, tileY, i + 570);
+        // Stem
+        ctx.fillStyle = '#3a2a1a';
+        ctx.fillRect(screenX + mx * (ts - 6) + 3, screenY + my * (ts - 6) + 5, 1, 3);
+        // Cap
+        ctx.fillStyle = '#2a1a10';
+        ctx.fillRect(screenX + mx * (ts - 6) + 2, screenY + my * (ts - 6) + 4, 3, 2);
       }
       break;
     }
+
     case TileType.SWAMP: {
-      ctx.fillStyle = '#3a5b2a';
-      ctx.fillRect(x + 6 + Math.sin(Date.now() / 2000 + x) * 2, y + 12, 6, 2);
-      ctx.fillRect(x + 18 + Math.cos(Date.now() / 2500 + y) * 2, y + 22, 8, 2);
+      // Algae patches
+      for (let i = 0; i < 3; i++) {
+        const ax = tileHash(tileX, tileY, i + 600);
+        const ay = tileHash(tileX, tileY, i + 610);
+        ctx.fillStyle = `rgba(20,50,10,${0.3 + ax * 0.2})`;
+        ctx.beginPath();
+        ctx.ellipse(screenX + 5 + ax * (ts - 10), screenY + 5 + ay * (ts - 10), 4 + ax * 3, 2 + ay * 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Murky bubbles (animated)
+      for (let i = 0; i < 2; i++) {
+        const bx = tileHash(tileX, tileY, i + 620);
+        const by = tileHash(tileX, tileY, i + 630);
+        const bubblePhase = time + tileX * 2 + i * 3;
+        const rise = (bubblePhase % 3) / 3; // 0-1 cycle
+        const alpha = 0.3 * (1 - rise);
+        ctx.fillStyle = `rgba(40,70,30,${alpha})`;
+        ctx.beginPath();
+        ctx.arc(screenX + 5 + bx * (ts - 10), screenY + ts - 4 - rise * (ts - 8), 2 + bx * 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Dead tree stump
+      if (tileHash(tileX, tileY, 640) > 0.75) {
+        ctx.fillStyle = '#1a1408';
+        ctx.fillRect(cx - 2, cy, 4, 8);
+        ctx.fillStyle = '#221a0a';
+        ctx.fillRect(cx - 3, cy - 1, 6, 3);
+      }
       break;
     }
+
     case TileType.SNOW: {
-      ctx.fillStyle = 'rgba(200,220,255,0.3)';
-      ctx.fillRect(x + 5, y + 10, 3, 2);
-      ctx.fillRect(x + 20, y + 18, 4, 2);
+      // Sparkle effects
+      for (let i = 0; i < 5; i++) {
+        const sx = tileHash(tileX, tileY, i + 700);
+        const sy = tileHash(tileX, tileY, i + 710);
+        const sparkle = Math.sin(time * 3 + tileX + tileY + i * 2) * 0.5 + 0.5;
+        if (sparkle > 0.7) {
+          ctx.fillStyle = `rgba(255,255,255,${sparkle * 0.8})`;
+          ctx.fillRect(screenX + sx * (ts - 4) + 2, screenY + sy * (ts - 4) + 2, 1, 1);
+        }
+      }
+      // Small snow mounds
+      for (let i = 0; i < 2; i++) {
+        const mx = tileHash(tileX, tileY, i + 720);
+        const my = tileHash(tileX, tileY, i + 730);
+        ctx.fillStyle = 'rgba(200,210,230,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(screenX + 6 + mx * (ts - 12), screenY + 6 + my * (ts - 12), 5, 3, mx * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
       break;
     }
+
+    case TileType.DIRT: {
+      // Small pebble dots
+      for (let i = 0; i < 5; i++) {
+        const px = tileHash(tileX, tileY, i + 800);
+        const py = tileHash(tileX, tileY, i + 810);
+        const shade = 40 + Math.floor(px * 30);
+        ctx.fillStyle = `rgb(${shade + 20},${shade + 10},${shade - 10})`;
+        ctx.fillRect(screenX + 3 + px * (ts - 6), screenY + 3 + py * (ts - 6), 2, 1);
+      }
+      // Occasional grass tufts
+      const tuftCount = Math.floor(tileHash(tileX, tileY, 820) * 3);
+      for (let i = 0; i < tuftCount; i++) {
+        const tx = tileHash(tileX, tileY, i + 830);
+        const ty = tileHash(tileX, tileY, i + 840);
+        ctx.fillStyle = '#2a4a1a';
+        const gx = screenX + 4 + tx * (ts - 8);
+        const gy = screenY + 4 + ty * (ts - 8);
+        ctx.fillRect(gx, gy - 3, 1, 3);
+        ctx.fillRect(gx + 2, gy - 4, 1, 4);
+        ctx.fillRect(gx - 1, gy - 2, 1, 2);
+      }
+      break;
+    }
+
+    case TileType.STONE_FLOOR: {
+      // Brick/tile pattern with grout lines
+      const brickW2 = ts / 2;
+      const brickH2 = ts / 2;
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+      ctx.lineWidth = 1;
+      // Horizontal line
+      ctx.beginPath();
+      ctx.moveTo(screenX, screenY + brickH2);
+      ctx.lineTo(screenX + ts, screenY + brickH2);
+      ctx.stroke();
+      // Vertical line (offset for brick pattern)
+      ctx.beginPath();
+      ctx.moveTo(screenX + brickW2, screenY);
+      ctx.lineTo(screenX + brickW2, screenY + ts);
+      ctx.stroke();
+      // Subtle texture on each brick quadrant
+      for (let qy = 0; qy < 2; qy++) {
+        for (let qx = 0; qx < 2; qx++) {
+          const shade = 60 + Math.floor(tileHash(tileX + qx, tileY + qy, 900) * 20);
+          ctx.fillStyle = `rgba(${shade},${shade},${shade},0.15)`;
+          ctx.fillRect(screenX + qx * brickW2 + 1, screenY + qy * brickH2 + 1, brickW2 - 2, brickH2 - 2);
+        }
+      }
+      break;
+    }
+
+    case TileType.WOOD_FLOOR: {
+      // Plank divisions (horizontal planks)
+      const plankH = ts / 4;
+      ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+      ctx.lineWidth = 1;
+      for (let i = 1; i < 4; i++) {
+        ctx.beginPath();
+        ctx.moveTo(screenX, screenY + i * plankH);
+        ctx.lineTo(screenX + ts, screenY + i * plankH);
+        ctx.stroke();
+      }
+      // Wood grain lines on each plank
+      for (let i = 0; i < 4; i++) {
+        const py = screenY + i * plankH;
+        const grainOffset = tileHash(tileX, tileY, i + 950) * 3;
+        ctx.strokeStyle = 'rgba(40,20,5,0.15)';
+        ctx.lineWidth = 1;
+        // Two grain lines per plank
+        ctx.beginPath();
+        ctx.moveTo(screenX + 2, py + plankH * 0.3 + grainOffset);
+        ctx.lineTo(screenX + ts - 2, py + plankH * 0.35 + grainOffset);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(screenX + 2, py + plankH * 0.7 - grainOffset);
+        ctx.lineTo(screenX + ts - 2, py + plankH * 0.65 - grainOffset);
+        ctx.stroke();
+        // Subtle knot
+        if (tileHash(tileX, tileY, i + 960) > 0.7) {
+          const kx = screenX + 5 + tileHash(tileX, tileY, i + 970) * (ts - 10);
+          const ky = py + plankH / 2;
+          ctx.fillStyle = 'rgba(30,15,5,0.2)';
+          ctx.beginPath();
+          ctx.ellipse(kx, ky, 3, 2, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      break;
+    }
+
+    case TileType.SAND: {
+      // Sand grain dots
+      for (let i = 0; i < 8; i++) {
+        const sx = tileHash(tileX, tileY, i + 1000);
+        const sy = tileHash(tileX, tileY, i + 1010);
+        const shade = 100 + Math.floor(sx * 40);
+        ctx.fillStyle = `rgba(${shade + 20},${shade + 10},${shade - 30},0.3)`;
+        ctx.fillRect(screenX + 2 + sx * (ts - 4), screenY + 2 + sy * (ts - 4), 1, 1);
+      }
+      // Occasional small rock
+      if (tileHash(tileX, tileY, 1020) > 0.85) {
+        const rx = screenX + 8 + tileHash(tileX, tileY, 1030) * 16;
+        const ry = screenY + 8 + tileHash(tileX, tileY, 1040) * 16;
+        ctx.fillStyle = '#5a5040';
+        ctx.beginPath();
+        ctx.ellipse(rx, ry, 3, 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Occasional tiny cactus
+      if (tileHash(tileX, tileY, 1050) > 0.92) {
+        const cax = screenX + ts / 2 + (tileHash(tileX, tileY, 1060) - 0.5) * 10;
+        const cay = screenY + ts / 2 + (tileHash(tileX, tileY, 1070) - 0.5) * 10;
+        ctx.fillStyle = '#2a5a1a';
+        ctx.fillRect(cax - 1, cay - 4, 2, 8);
+        ctx.fillRect(cax + 2, cay - 2, 3, 2);
+        ctx.fillRect(cax - 5, cay - 1, 3, 2);
+      }
+      break;
+    }
+
     default:
       break;
   }
 }
 
 // =============================================
-// Player sprite rendering
+// Player sprite rendering — Vocation-specific (Tibia Premium style)
 // =============================================
+
+interface VocationOutfit {
+  // Body/armor colors
+  bodyMain: string;       // primary body/armor color
+  bodyDark: string;       // darker shade for depth
+  bodyLight: string;      // highlight
+  // Skin/hair
+  skinColor: string;
+  hairColor: string;
+  // Legs
+  legsColor: string;
+  bootsColor: string;
+  // Weapon colors
+  weaponMetal: string;
+  weaponHandle: string;
+  weaponType: 'sword' | 'staff' | 'bow' | 'spear';
+  // Shield
+  hasShield: boolean;
+  shieldColor: string;
+  shieldTrim: string;
+  // Head
+  hasHelmet: boolean;
+  helmetColor: string;
+  helmetPlume: string;
+  // Cape
+  hasCape: boolean;
+  capeColor: string;
+  // Robe (for casters)
+  hasRobe: boolean;
+  robeColor: string;
+  robeTrim: string;
+  // Glow (for magic users)
+  glowColor: string | null;
+}
+
+const VOCATION_OUTFITS: Record<string, VocationOutfit> = {
+  [Vocation.KNIGHT]: {
+    bodyMain: '#8a8a9a', bodyDark: '#5a5a6a', bodyLight: '#aaaabc',
+    skinColor: '#f0c8a0', hairColor: '#4a3020',
+    legsColor: '#6a6a7a', bootsColor: '#5a3a1a',
+    weaponMetal: '#d0d0e0', weaponHandle: '#6a3a10', weaponType: 'sword',
+    hasShield: true, shieldColor: '#7a7a8a', shieldTrim: '#DAA520',
+    hasHelmet: true, helmetColor: '#7a7a8a', helmetPlume: '#cc2222',
+    hasCape: true, capeColor: '#cc2222',
+    hasRobe: false, robeColor: '', robeTrim: '',
+    glowColor: null,
+  },
+  [Vocation.SORCERER]: {
+    bodyMain: '#2a1a4a', bodyDark: '#1a0a2a', bodyLight: '#4a3a6a',
+    skinColor: '#f0d0b0', hairColor: '#1a1a2a',
+    legsColor: '#2a1a4a', bootsColor: '#3a2a1a',
+    weaponMetal: '#8a6aff', weaponHandle: '#4a2a0a', weaponType: 'staff',
+    hasShield: false, shieldColor: '', shieldTrim: '',
+    hasHelmet: false, helmetColor: '', helmetPlume: '',
+    hasCape: false, capeColor: '',
+    hasRobe: true, robeColor: '#1a0a3a', robeTrim: '#8a6aff',
+    glowColor: '#8a6aff',
+  },
+  [Vocation.DRUID]: {
+    bodyMain: '#2a4a1a', bodyDark: '#1a3a0a', bodyLight: '#4a6a3a',
+    skinColor: '#e8c898', hairColor: '#3a5a2a',
+    legsColor: '#3a4a2a', bootsColor: '#5a4020',
+    weaponMetal: '#8B4513', weaponHandle: '#3a2010', weaponType: 'staff',
+    hasShield: false, shieldColor: '', shieldTrim: '',
+    hasHelmet: false, helmetColor: '', helmetPlume: '',
+    hasCape: false, capeColor: '',
+    hasRobe: true, robeColor: '#1a3a0a', robeTrim: '#4a8a2a',
+    glowColor: '#4aff4a',
+  },
+  [Vocation.PALADIN]: {
+    bodyMain: '#3a6a3a', bodyDark: '#2a4a2a', bodyLight: '#5a8a5a',
+    skinColor: '#f0c8a0', hairColor: '#6a4a20',
+    legsColor: '#3a5a3a', bootsColor: '#4a3018',
+    weaponMetal: '#c0c0c0', weaponHandle: '#5a3a10', weaponType: 'bow',
+    hasShield: false, shieldColor: '', shieldTrim: '',
+    hasHelmet: true, helmetColor: '#4a6a3a', helmetPlume: '#2a8a2a',
+    hasCape: true, capeColor: '#2a6a2a',
+    hasRobe: false, robeColor: '', robeTrim: '',
+    glowColor: null,
+  },
+};
+
 function drawPlayerSprite(
   ctx: CanvasRenderingContext2D,
   name: string,
@@ -192,108 +695,1018 @@ function drawPlayerSprite(
   level: number,
   health: number,
   maxHealth: number,
-  hasBuff: boolean
+  hasBuff: boolean,
+  vocation?: Vocation
 ) {
   const ts = TILE_SIZE;
   const cx = x + ts / 2;
   const cy = y + ts / 2;
+  const facingSouth = direction === Direction.SOUTH;
+  const facingNorth = direction === Direction.NORTH;
+  const facingEast = direction === Direction.EAST;
+  const facingWest = direction === Direction.WEST;
+  const facingSide = facingEast || facingWest;
+  const sideFlip = facingWest ? -1 : 1;
 
-  // Buff aura
+  // Pick outfit
+  const effectiveVoc = vocation || Vocation.KNIGHT;
+  const outfit = VOCATION_OUTFITS[effectiveVoc];
+  const isCaster = effectiveVoc === Vocation.SORCERER || effectiveVoc === Vocation.DRUID;
+  const isKnight = effectiveVoc === Vocation.KNIGHT;
+  const isPaladin = effectiveVoc === Vocation.PALADIN;
+
+  // ---- Try AI sprite first ----
+  const playerSprites = PLAYER_SPRITES[effectiveVoc];
+  if (playerSprites) {
+    const spriteUrl = getSpriteForDirection(playerSprites, direction);
+    const img = spriteCache[spriteUrl];
+    if (img && img.complete && img.naturalWidth > 0) {
+      // Draw shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.beginPath();
+      ctx.ellipse(cx, y + ts - 2, 11, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Buff aura
+      if (hasBuff) {
+        const t = Date.now() / 300;
+        ctx.strokeStyle = `rgba(255,165,0,${0.3 + Math.sin(t) * 0.2})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 16 + Math.sin(t) * 2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Magic user glow
+      if (outfit.glowColor) {
+        const t = Date.now() / 400;
+        const gc = outfit.glowColor;
+        const r2 = parseInt(gc.slice(1, 3), 16) || 100;
+        const g2 = parseInt(gc.slice(3, 5), 16) || 100;
+        const b2 = parseInt(gc.slice(5, 7), 16) || 200;
+        ctx.fillStyle = `rgba(${r2},${g2},${b2},${0.18 + Math.sin(t) * 0.12})`;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 16 + Math.sin(t) * 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Draw the AI sprite (larger for better visibility, like Tibia characters)
+      const spriteSize = ts + 16;
+      const sx = cx - spriteSize / 2;
+      const sy = cy - spriteSize / 2 - 4;
+      // Subtle dark outline for contrast against tiles
+      ctx.shadowColor = 'rgba(0,0,0,0.6)';
+      ctx.shadowBlur = 3;
+      ctx.drawImage(img, sx, sy, spriteSize, spriteSize);
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+
+      // Name
+      drawPlayerLabels(ctx, cx, y, name, effectiveVoc, level, health, maxHealth);
+      return;
+    }
+  }
+
+  // ====== CANVAS FALLBACK (premium Tibia outfits) ======
+  const time = Date.now() / 1000;
+  const walkBob = Math.sin(time * 4) * 0.8; // subtle idle bob
+
+  // ---- Buff aura ----
   if (hasBuff) {
-    const time = Date.now() / 300;
-    ctx.strokeStyle = `rgba(255, 165, 0, ${0.3 + Math.sin(time) * 0.2})`;
+    const t = Date.now() / 300;
+    ctx.strokeStyle = `rgba(255,165,0,${0.3 + Math.sin(t) * 0.2})`;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(cx, cy, 16 + Math.sin(time) * 2, 0, Math.PI * 2);
+    ctx.arc(cx, cy, 16 + Math.sin(t) * 2, 0, Math.PI * 2);
     ctx.stroke();
   }
 
-  ctx.fillStyle = 'rgba(0,0,0,0.3)';
-  ctx.beginPath();
-  ctx.ellipse(cx, y + ts - 3, 10, 4, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = color;
-  ctx.fillRect(cx - 6, cy - 4, 12, 14);
-
-  ctx.fillStyle = '#ffdbac';
-  ctx.beginPath();
-  ctx.arc(cx, cy - 6, 7, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#5a3a1a';
-  ctx.beginPath();
-  ctx.arc(cx, cy - 9, 7, Math.PI, 0);
-  ctx.fill();
-
-  ctx.fillStyle = '#000';
-  if (direction === Direction.SOUTH) {
-    ctx.fillRect(cx - 3, cy - 7, 2, 2);
-    ctx.fillRect(cx + 1, cy - 7, 2, 2);
-  } else if (direction === Direction.EAST) {
-    ctx.fillRect(cx + 1, cy - 7, 2, 2);
-  } else if (direction === Direction.WEST) {
-    ctx.fillRect(cx - 3, cy - 7, 2, 2);
+  // ---- Magic user glow ----
+  if (outfit.glowColor) {
+    const t = Date.now() / 400;
+    const gc = outfit.glowColor;
+    const r2 = parseInt(gc.slice(1, 3), 16) || 100;
+    const g2 = parseInt(gc.slice(3, 5), 16) || 100;
+    const b2 = parseInt(gc.slice(5, 7), 16) || 200;
+    ctx.fillStyle = `rgba(${r2},${g2},${b2},${0.18 + Math.sin(t) * 0.12})`;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 16 + Math.sin(t) * 3, 0, Math.PI * 2);
+    ctx.fill();
   }
 
-  // Weapon (sword) in hand
-  ctx.fillStyle = '#a0a0a0';
-  ctx.strokeStyle = '#707070';
-  ctx.lineWidth = 1;
-  const dirOff = DIR_OFFSETS[direction];
-  const swordX = cx + dirOff.x * 14;
-  const swordY = cy + dirOff.y * 14;
-  ctx.save();
-  ctx.translate(swordX, swordY);
-  const angle = direction === Direction.NORTH ? -Math.PI / 2 : direction === Direction.SOUTH ? Math.PI / 2 : direction === Direction.EAST ? 0 : Math.PI;
-  ctx.rotate(angle);
-  // Sword blade
-  ctx.fillStyle = '#c0c0c0';
-  ctx.fillRect(-1, -12, 3, 12);
-  // Sword tip
+  // ---- Shadow ----
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
   ctx.beginPath();
-  ctx.moveTo(-1, -12);
-  ctx.lineTo(0.5, -16);
-  ctx.lineTo(2, -12);
+  ctx.ellipse(cx, y + ts - 2, 12, 4, 0, 0, Math.PI * 2);
   ctx.fill();
-  // Handle
-  ctx.fillStyle = '#8B4513';
-  ctx.fillRect(-2, 0, 5, 4);
-  // Guard
-  ctx.fillStyle = '#DAA520';
-  ctx.fillRect(-3, -1, 7, 2);
+
+  const by = cy + walkBob; // bobbing Y offset
+
+  // ---- Cape (back layer, visible from north/side/south-back) ----
+  if (outfit.hasCape) {
+    ctx.fillStyle = outfit.capeColor;
+    ctx.beginPath();
+    if (facingNorth) {
+      // Cape drapes down behind, wider
+      ctx.moveTo(cx - 7, by - 4);
+      ctx.quadraticCurveTo(cx - 10, by + 6, cx - 6, by + 13);
+      ctx.lineTo(cx + 6, by + 13);
+      ctx.quadraticCurveTo(cx + 10, by + 6, cx + 7, by - 4);
+    } else if (facingSide) {
+      const offX = facingWest ? 4 : -4;
+      ctx.moveTo(cx + offX - 5, by - 4);
+      ctx.quadraticCurveTo(cx + offX - 8, by + 5, cx + offX - 5, by + 13);
+      ctx.lineTo(cx + offX + 5, by + 13);
+      ctx.quadraticCurveTo(cx + offX + 4, by + 5, cx + offX + 4, by - 4);
+    } else {
+      // South - cape peek behind shoulders
+      ctx.moveTo(cx - 6, by - 5);
+      ctx.quadraticCurveTo(cx - 8, by + 2, cx - 5, by + 10);
+      ctx.lineTo(cx - 2, by + 10);
+      ctx.quadraticCurveTo(cx - 3, by + 2, cx - 2, by - 5);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(cx + 2, by - 5);
+      ctx.quadraticCurveTo(cx + 3, by + 2, cx + 2, by + 10);
+      ctx.lineTo(cx + 5, by + 10);
+      ctx.quadraticCurveTo(cx + 8, by + 2, cx + 6, by - 5);
+    }
+    ctx.fill();
+    // Cape inner shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fill();
+    // Cape gold clasp at top (for paladin)
+    if (isPaladin && facingNorth) {
+      ctx.fillStyle = '#DAA520';
+      ctx.beginPath();
+      ctx.arc(cx, by - 3, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // ---- Robe (caster back layer) ----
+  if (outfit.hasRobe) {
+    ctx.fillStyle = outfit.robeColor;
+    ctx.beginPath();
+    if (facingSouth) {
+      ctx.moveTo(cx - 8, by - 3);
+      ctx.lineTo(cx - 10, by + 13);
+      ctx.lineTo(cx + 10, by + 13);
+      ctx.lineTo(cx + 8, by - 3);
+    } else if (facingNorth) {
+      ctx.moveTo(cx - 8, by - 3);
+      ctx.lineTo(cx - 9, by + 14);
+      ctx.lineTo(cx + 9, by + 14);
+      ctx.lineTo(cx + 8, by - 3);
+    } else {
+      const rx = facingWest ? -3 : 3;
+      ctx.moveTo(cx + rx - 7, by - 3);
+      ctx.lineTo(cx + rx - 9, by + 14);
+      ctx.lineTo(cx + rx + 7, by + 14);
+      ctx.lineTo(cx + rx + 6, by - 3);
+    }
+    ctx.fill();
+    // Robe trim at bottom (double line for premium feel)
+    ctx.strokeStyle = outfit.robeTrim;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (facingSouth || facingNorth) {
+      ctx.moveTo(cx - 10, by + 13);
+      ctx.lineTo(cx + 10, by + 13);
+    } else {
+      const rx = facingWest ? -3 : 3;
+      ctx.moveTo(cx + rx - 9, by + 14);
+      ctx.lineTo(cx + rx + 7, by + 14);
+    }
+    ctx.stroke();
+    // Second trim line
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    if (facingSouth || facingNorth) {
+      ctx.moveTo(cx - 9, by + 11);
+      ctx.lineTo(cx + 9, by + 11);
+    } else {
+      const rx = facingWest ? -3 : 3;
+      ctx.moveTo(cx + rx - 8, by + 12);
+      ctx.lineTo(cx + rx + 6, by + 12);
+    }
+    ctx.stroke();
+    // Robe center line
+    ctx.strokeStyle = `${outfit.robeTrim}55`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx, by - 1);
+    ctx.lineTo(cx, by + 13);
+    ctx.stroke();
+    // Arcane runes on robe (for sorcerer)
+    if (effectiveVoc === Vocation.SORCERER && facingSouth) {
+      ctx.fillStyle = '#8a6aff66';
+      ctx.beginPath();
+      ctx.arc(cx - 4, by + 5, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(cx + 3, by + 8, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(cx + 5, by + 3, 1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Vine pattern on druid robe
+    if (effectiveVoc === Vocation.DRUID && facingSouth) {
+      ctx.strokeStyle = '#4a8a2a44';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(cx - 2, by + 2);
+      ctx.quadraticCurveTo(cx - 4, by + 6, cx - 1, by + 9);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx + 2, by + 3);
+      ctx.quadraticCurveTo(cx + 4, by + 7, cx + 2, by + 10);
+      ctx.stroke();
+    }
+  }
+
+  // ---- Legs/boots ----
+  if (!outfit.hasRobe || facingSouth) {
+    const legSpread = facingSide ? 1 : 2;
+    // Left leg
+    ctx.fillStyle = outfit.legsColor;
+    ctx.fillRect(cx - 5 - legSpread, by + 4, 5, 8);
+    // Right leg
+    ctx.fillRect(cx + legSpread, by + 4, 5, 8);
+    // Leg armor lines (knight)
+    if (isKnight) {
+      ctx.strokeStyle = '#9a9aaa55';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(cx - 5 - legSpread, by + 7);
+      ctx.lineTo(cx - legSpread, by + 7);
+      ctx.moveTo(cx + legSpread, by + 7);
+      ctx.lineTo(cx + 5 + legSpread, by + 7);
+      ctx.stroke();
+    }
+    // Boots - more detailed
+    ctx.fillStyle = outfit.bootsColor;
+    // Left boot
+    ctx.fillRect(cx - 5 - legSpread, by + 10, 5, 3);
+    ctx.fillRect(cx - 6 - legSpread, by + 11, 7, 2); // boot wider at bottom
+    // Right boot
+    ctx.fillRect(cx + legSpread, by + 10, 5, 3);
+    ctx.fillRect(cx - 1 + legSpread, by + 11, 7, 2);
+    // Boot straps
+    if (isKnight || isPaladin) {
+      ctx.strokeStyle = '#3a2a1055';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(cx - 5 - legSpread, by + 11);
+      ctx.lineTo(cx - legSpread, by + 11);
+      ctx.moveTo(cx + legSpread, by + 11);
+      ctx.lineTo(cx + 5 + legSpread, by + 11);
+      ctx.stroke();
+    }
+  } else {
+    // Robe covers legs, just show boot tips
+    ctx.fillStyle = outfit.bootsColor;
+    ctx.fillRect(cx - 5, by + 11, 4, 2);
+    ctx.fillRect(cx + 1, by + 11, 4, 2);
+  }
+
+  // ---- Body / Armor ----
+  // Darker armor underlayer
+  ctx.fillStyle = outfit.bodyDark;
+  if (outfit.hasRobe) {
+    ctx.beginPath();
+    ctx.ellipse(cx, by + 1, 8, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.fillRect(cx - 8, by - 6, 16, 13);
+  }
+  // Main armor/body
+  ctx.fillStyle = outfit.bodyMain;
+  if (outfit.hasRobe) {
+    ctx.beginPath();
+    ctx.ellipse(cx, by, 7, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Robe collar
+    ctx.strokeStyle = outfit.robeTrim;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(cx, by - 3, 6, Math.PI * 0.2, Math.PI * 0.8);
+    ctx.stroke();
+  } else {
+    ctx.fillRect(cx - 7, by - 5, 14, 11);
+    // Armor highlight on chest
+    ctx.fillStyle = outfit.bodyLight;
+    ctx.fillRect(cx - 5, by - 4, 3, 6);
+
+    // Knight: segmented plate armor
+    if (isKnight) {
+      // Chest plate segments
+      ctx.strokeStyle = '#9a9aaa';
+      ctx.lineWidth = 0.6;
+      ctx.beginPath();
+      ctx.moveTo(cx - 6, by - 2);
+      ctx.lineTo(cx + 6, by - 2);
+      ctx.moveTo(cx - 6, by + 1);
+      ctx.lineTo(cx + 6, by + 1);
+      ctx.stroke();
+      // Center rivet line
+      ctx.fillStyle = '#DAA52088';
+      ctx.fillRect(cx - 0.5, by - 4, 1, 9);
+      // Side rivets
+      ctx.beginPath();
+      ctx.arc(cx - 5, by - 3, 0.7, 0, Math.PI * 2);
+      ctx.arc(cx - 5, by + 2, 0.7, 0, Math.PI * 2);
+      ctx.arc(cx + 5, by - 3, 0.7, 0, Math.PI * 2);
+      ctx.arc(cx + 5, by + 2, 0.7, 0, Math.PI * 2);
+      ctx.fill();
+      // Belt with golden buckle
+      ctx.fillStyle = '#4a2a0a';
+      ctx.fillRect(cx - 7, by + 4, 14, 3);
+      ctx.strokeStyle = '#DAA520';
+      ctx.lineWidth = 0.8;
+      ctx.strokeRect(cx - 7, by + 4, 14, 3);
+      // Belt buckle
+      ctx.fillStyle = '#DAA520';
+      ctx.fillRect(cx - 2, by + 4.5, 4, 2);
+      ctx.fillStyle = '#4a2a0a';
+      ctx.fillRect(cx - 0.5, by + 5, 1, 1);
+    }
+
+    // Paladin: leather armor with emblem
+    if (isPaladin) {
+      // Studded leather lines
+      ctx.strokeStyle = '#2a4a2a';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(cx - 6, by - 2);
+      ctx.lineTo(cx + 6, by - 2);
+      ctx.moveTo(cx - 6, by + 1);
+      ctx.lineTo(cx + 6, by + 1);
+      ctx.stroke();
+      // Chest emblem (gold sun/cross)
+      ctx.fillStyle = '#DAA520';
+      ctx.beginPath();
+      ctx.arc(cx, by - 1, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#2a4a2a';
+      ctx.beginPath();
+      ctx.arc(cx, by - 1, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#DAA520';
+      ctx.fillRect(cx - 0.5, by - 3.5, 1, 5);
+      ctx.fillRect(cx - 2.5, by - 1.5, 5, 1);
+      // Belt
+      ctx.fillStyle = '#3a2a10';
+      ctx.fillRect(cx - 7, by + 4, 14, 2.5);
+      ctx.fillStyle = '#DAA520';
+      ctx.fillRect(cx - 1.5, by + 4.2, 3, 2);
+    }
+  }
+
+  // ---- Shoulder Pauldrons (Knight) ----
+  if (isKnight && !facingNorth) {
+    ctx.fillStyle = outfit.bodyMain;
+    ctx.strokeStyle = outfit.bodyLight;
+    ctx.lineWidth = 0.5;
+    // Left pauldron
+    if (!facingSide || facingEast) {
+      ctx.beginPath();
+      ctx.ellipse(cx - 8, by - 4, 4, 3, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      // Pauldron rivet
+      ctx.fillStyle = '#DAA520';
+      ctx.beginPath();
+      ctx.arc(cx - 8, by - 4, 1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Right pauldron
+    if (!facingSide || facingWest) {
+      ctx.fillStyle = outfit.bodyMain;
+      ctx.beginPath();
+      ctx.ellipse(cx + 8, by - 4, 4, 3, 0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = outfit.bodyLight;
+      ctx.stroke();
+      ctx.fillStyle = '#DAA520';
+      ctx.beginPath();
+      ctx.arc(cx + 8, by - 4, 1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // ---- Arms ----
+  const armY = by - 2;
+  ctx.fillStyle = outfit.bodyMain;
+  if (facingSide) {
+    ctx.fillRect(cx + sideFlip * 7, armY, 4, 9);
+    ctx.fillStyle = outfit.bodyDark;
+    ctx.fillRect(cx - sideFlip * 5, armY, 3, 8);
+  } else {
+    ctx.fillRect(cx - 10, armY, 3, 9);
+    ctx.fillRect(cx + 7, armY, 3, 9);
+  }
+  // Gauntlets/Bracers
+  if (isKnight) {
+    ctx.fillStyle = '#8a8a9a';
+    if (facingSide) {
+      ctx.fillRect(cx + sideFlip * 7, armY + 6, 4, 3);
+    } else {
+      ctx.fillRect(cx - 10, armY + 6, 3, 3);
+      ctx.fillRect(cx + 7, armY + 6, 3, 3);
+    }
+  }
+  if (isPaladin) {
+    ctx.fillStyle = '#3a4a2a';
+    if (facingSide) {
+      ctx.fillRect(cx + sideFlip * 7, armY + 5, 4, 2);
+    } else {
+      ctx.fillRect(cx - 10, armY + 5, 3, 2);
+      ctx.fillRect(cx + 7, armY + 5, 3, 2);
+    }
+  }
+  // Hands (skin)
+  ctx.fillStyle = outfit.skinColor;
+  if (facingSide) {
+    ctx.fillRect(cx + sideFlip * 7, armY + 7, 4, 3);
+  } else {
+    ctx.fillRect(cx - 10, armY + 7, 3, 3);
+    ctx.fillRect(cx + 7, armY + 7, 3, 3);
+  }
+
+  // ---- Shield (Knight) ----
+  if (outfit.hasShield) {
+    const shX = facingSide ? cx - sideFlip * 12 : cx - 12;
+    const shY = by - 2;
+    // Shield body - larger, more detailed
+    ctx.fillStyle = outfit.shieldColor;
+    ctx.beginPath();
+    ctx.moveTo(shX - 5, shY - 6);
+    ctx.lineTo(shX + 5, shY - 6);
+    ctx.lineTo(shX + 5, shY + 4);
+    ctx.lineTo(shX, shY + 8);
+    ctx.lineTo(shX - 5, shY + 4);
+    ctx.closePath();
+    ctx.fill();
+    // Shield border - double
+    ctx.strokeStyle = outfit.shieldTrim;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.strokeStyle = outfit.shieldTrim + '88';
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(shX - 3.5, shY - 4.5);
+    ctx.lineTo(shX + 3.5, shY - 4.5);
+    ctx.lineTo(shX + 3.5, shY + 3);
+    ctx.lineTo(shX, shY + 6);
+    ctx.lineTo(shX - 3.5, shY + 3);
+    ctx.closePath();
+    ctx.stroke();
+    // Shield cross emblem
+    ctx.strokeStyle = outfit.shieldTrim;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(shX, shY - 4);
+    ctx.lineTo(shX, shY + 6);
+    ctx.moveTo(shX - 3, shY - 0.5);
+    ctx.lineTo(shX + 3, shY - 0.5);
+    ctx.stroke();
+    // Shield highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fillRect(shX - 3, shY - 5, 3, 5);
+    // Center gem
+    ctx.fillStyle = '#cc2222';
+    ctx.beginPath();
+    ctx.arc(shX, shY - 0.5, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath();
+    ctx.arc(shX - 0.3, shY - 1, 0.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ---- Quiver (Paladin, on back) ----
+  if (isPaladin && (facingNorth || (facingSide && facingEast))) {
+    const qX = facingNorth ? cx + 3 : cx + sideFlip * 2;
+    const qY = by - 4;
+    ctx.fillStyle = '#5a3a1a';
+    ctx.fillRect(qX - 2, qY, 5, 12);
+    ctx.strokeStyle = '#3a2010';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(qX - 2, qY, 5, 12);
+    // Arrow fletchings sticking out
+    ctx.fillStyle = '#cc4444';
+    ctx.fillRect(qX - 1, qY - 3, 1, 4);
+    ctx.fillRect(qX + 1, qY - 4, 1, 5);
+    ctx.fillRect(qX + 0, qY - 2, 1, 3);
+    // Arrow tips
+    ctx.fillStyle = '#aaa';
+    ctx.fillRect(qX - 1, qY + 10, 1, 3);
+    ctx.fillRect(qX + 1, qY + 11, 1, 2);
+  }
+
+  // ---- Weapon ----
+  const weaponX = facingSide ? cx + sideFlip * 12 : cx + 12;
+  const weaponY = by - 2;
+  ctx.save();
+  ctx.translate(weaponX, weaponY);
+
+  if (outfit.weaponType === 'sword') {
+    const swAngle = facingSouth ? Math.PI / 2 : facingNorth ? -Math.PI / 2 : facingEast ? 0 : Math.PI;
+    ctx.rotate(swAngle);
+    // Blade - wider, more detailed
+    ctx.fillStyle = outfit.weaponMetal;
+    ctx.beginPath();
+    ctx.moveTo(-1.5, -14);
+    ctx.lineTo(1.5, -14);
+    ctx.lineTo(2, 0);
+    ctx.lineTo(-2, 0);
+    ctx.closePath();
+    ctx.fill();
+    // Blade tip
+    ctx.beginPath();
+    ctx.moveTo(-1.5, -14);
+    ctx.lineTo(0, -19);
+    ctx.lineTo(1.5, -14);
+    ctx.fill();
+    // Blade center line (fuller)
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fillRect(-0.5, -18, 1, 16);
+    // Blade edge highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fillRect(-1.5, -13, 0.8, 12);
+    // Crossguard - ornate
+    ctx.fillStyle = '#DAA520';
+    ctx.fillRect(-4, -1, 9, 2.5);
+    ctx.fillStyle = '#B8860B';
+    ctx.fillRect(-3.5, -0.5, 8, 1.5);
+    // Handle - wrapped leather
+    ctx.fillStyle = outfit.weaponHandle;
+    ctx.fillRect(-2, 1.5, 5, 5);
+    // Handle wrap
+    ctx.strokeStyle = '#4a2a0a';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(-2, 3); ctx.lineTo(3, 3);
+    ctx.moveTo(-2, 5); ctx.lineTo(3, 5);
+    ctx.stroke();
+    // Pommel - ornate
+    ctx.fillStyle = '#DAA520';
+    ctx.beginPath();
+    ctx.arc(0.5, 7, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#cc2222';
+    ctx.beginPath();
+    ctx.arc(0.5, 7, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (outfit.weaponType === 'staff') {
+    // Staff body - wooden
+    ctx.fillStyle = effectiveVoc === Vocation.SORCERER ? '#3a2060' : '#5a3a18';
+    ctx.fillRect(-2, -16, 4, 24);
+    // Staff highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fillRect(-0.5, -15, 1, 22);
+    // Staff wrapping
+    ctx.strokeStyle = effectiveVoc === Vocation.SORCERER ? '#8a6aff44' : '#4a8a2a44';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-2, -8); ctx.lineTo(2, -8);
+    ctx.moveTo(-2, -4); ctx.lineTo(2, -4);
+    ctx.moveTo(-2, 0); ctx.lineTo(2, 0);
+    ctx.moveTo(-2, 4); ctx.lineTo(2, 4);
+    ctx.stroke();
+    // Orb on top with glow
+    const orbColor = effectiveVoc === Vocation.SORCERER ? '#8a6aff' : '#4aff4a';
+    const orbR = effectiveVoc === Vocation.SORCERER ? '138,106,255' : '74,255,74';
+    const t = Date.now() / 400;
+    // Outer glow
+    ctx.fillStyle = `rgba(${orbR},${0.12 + Math.sin(t) * 0.08})`;
+    ctx.beginPath();
+    ctx.arc(0, -17, 8, 0, Math.PI * 2);
+    ctx.fill();
+    // Inner glow
+    ctx.fillStyle = `rgba(${orbR},${0.2 + Math.sin(t) * 0.1})`;
+    ctx.beginPath();
+    ctx.arc(0, -17, 5, 0, Math.PI * 2);
+    ctx.fill();
+    // Orb
+    ctx.fillStyle = orbColor;
+    ctx.beginPath();
+    ctx.arc(0, -17, 4, 0, Math.PI * 2);
+    ctx.fill();
+    // Orb bright center
+    ctx.fillStyle = `rgba(255,255,255,${0.5 + Math.sin(t * 2) * 0.2})`;
+    ctx.beginPath();
+    ctx.arc(-1, -18, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+    // Floating particles
+    for (let i = 0; i < 3; i++) {
+      const px = Math.sin(time * 2 + i * 2.1) * 6;
+      const py = -17 + Math.cos(time * 1.5 + i * 1.7) * 5;
+      ctx.fillStyle = `rgba(${orbR},0.5)`;
+      ctx.beginPath();
+      ctx.arc(px, py, 0.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (outfit.weaponType === 'bow') {
+    // Crossbow body
+    ctx.strokeStyle = '#6a3a18';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(sideFlip * 3, -2, 11, -Math.PI / 2.5, Math.PI / 2.5);
+    ctx.stroke();
+    // Crossbow prod (metal arms)
+    ctx.strokeStyle = '#aaa';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(sideFlip * 3, -2, 12, -Math.PI / 2.5, Math.PI / 2.5);
+    ctx.stroke();
+    // Crossbow mechanism
+    ctx.fillStyle = '#5a3a1a';
+    ctx.fillRect(sideFlip * -1, -4, sideFlip * 4, 3);
+    // Bowstring
+    ctx.strokeStyle = '#ccc';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    const bTop = -2 + Math.sin(-Math.PI / 2.5) * 11;
+    const bBot = -2 + Math.sin(Math.PI / 2.5) * 11;
+    ctx.moveTo(sideFlip * 3 + Math.cos(-Math.PI / 2.5) * 11, bTop);
+    ctx.lineTo(sideFlip * -1, -2.5);
+    ctx.lineTo(sideFlip * 3 + Math.cos(Math.PI / 2.5) * 11, bBot);
+    ctx.stroke();
+    // Arrow loaded
+    if (facingSouth || facingSide) {
+      ctx.fillStyle = '#c0c0c0';
+      ctx.fillRect(-0.5, -20, 1.2, 14);
+      // Arrowhead
+      ctx.fillStyle = '#888';
+      ctx.beginPath();
+      ctx.moveTo(-2, -20);
+      ctx.lineTo(0.5, -24);
+      ctx.lineTo(3, -20);
+      ctx.fill();
+      // Fletching
+      ctx.fillStyle = '#cc4444';
+      ctx.beginPath();
+      ctx.moveTo(-1.5, -7);
+      ctx.lineTo(0.5, -9);
+      ctx.lineTo(2.5, -7);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-1, -5);
+      ctx.lineTo(0.5, -7);
+      ctx.lineTo(2, -5);
+      ctx.fill();
+    }
+  }
+
   ctx.restore();
 
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(cx + dirOff.x * 18, cy + dirOff.y * 18);
-  ctx.lineTo(cx + dirOff.x * 14 + (dirOff.y !== 0 ? -3 : 0), cy + dirOff.y * 14 + (dirOff.x !== 0 ? -3 : 0));
-  ctx.lineTo(cx + dirOff.x * 14 + (dirOff.y !== 0 ? 3 : 0), cy + dirOff.y * 14 + (dirOff.x !== 0 ? 3 : 0));
-  ctx.fill();
+  // ---- Head ----
+  const headY = by - 10;
+  const headX = facingSide ? cx + sideFlip * 1 : cx;
 
+  // Helmet
+  if (outfit.hasHelmet) {
+    if (isKnight) {
+      // Full plate helmet with T-visor
+      ctx.fillStyle = outfit.helmetColor;
+      if (facingSouth) {
+        // Helmet dome
+        ctx.beginPath();
+        ctx.arc(cx, headY, 7.5, Math.PI, 0);
+        ctx.fill();
+        ctx.fillRect(cx - 7.5, headY, 15, 3);
+        // Visor slit (T-shape)
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(cx - 5, headY - 2, 10, 2);
+        ctx.fillRect(cx - 1, headY - 5, 2, 3);
+        // Visor frame
+        ctx.strokeStyle = '#5a5a6a';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(cx - 5.5, headY - 2.5, 11, 3);
+        // Plume base
+        ctx.fillStyle = '#6a3a10';
+        ctx.fillRect(cx - 1.5, headY - 8, 3, 3);
+        // Plume feathers
+        ctx.fillStyle = outfit.helmetPlume;
+        ctx.beginPath();
+        ctx.moveTo(cx, headY - 8);
+        ctx.quadraticCurveTo(cx + 8, headY - 14, cx + 3, headY - 17);
+        ctx.quadraticCurveTo(cx + 1, headY - 13, cx - 1, headY - 17);
+        ctx.quadraticCurveTo(cx - 7, headY - 14, cx, headY - 8);
+        ctx.fill();
+        // Plume highlight
+        ctx.fillStyle = '#ff444444';
+        ctx.beginPath();
+        ctx.moveTo(cx + 1, headY - 9);
+        ctx.quadraticCurveTo(cx + 5, headY - 13, cx + 2, headY - 15);
+        ctx.quadraticCurveTo(cx + 1, headY - 11, cx + 1, headY - 9);
+        ctx.fill();
+        // Helmet rivets
+        ctx.fillStyle = '#DAA52066';
+        ctx.beginPath();
+        ctx.arc(cx - 6, headY, 0.8, 0, Math.PI * 2);
+        ctx.arc(cx + 6, headY, 0.8, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (facingNorth) {
+        ctx.beginPath();
+        ctx.arc(cx, headY, 7.5, 0, Math.PI);
+        ctx.fill();
+        ctx.fillRect(cx - 7.5, headY - 3, 15, 3);
+        // Plume from behind - flowing
+        ctx.fillStyle = outfit.helmetPlume;
+        ctx.beginPath();
+        ctx.moveTo(cx - 4, headY + 2);
+        ctx.quadraticCurveTo(cx - 10, headY - 6, cx, headY - 10);
+        ctx.quadraticCurveTo(cx + 10, headY - 6, cx + 4, headY + 2);
+        ctx.fill();
+        ctx.fillStyle = '#ff444433';
+        ctx.beginPath();
+        ctx.moveTo(cx - 2, headY);
+        ctx.quadraticCurveTo(cx - 6, headY - 5, cx, headY - 8);
+        ctx.fill();
+      } else {
+        ctx.beginPath();
+        ctx.arc(headX, headY, 7.5, 0, Math.PI * 2);
+        ctx.fill();
+        // Side visor slit
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(headX + sideFlip * 2, headY - 2, 4, 2);
+        // Plume
+        ctx.fillStyle = outfit.helmetPlume;
+        ctx.beginPath();
+        ctx.moveTo(headX, headY - 7.5);
+        ctx.quadraticCurveTo(headX + sideFlip * 10, headY - 14, headX + sideFlip * 5, headY - 17);
+        ctx.quadraticCurveTo(headX + sideFlip * 2, headY - 12, headX, headY - 7.5);
+        ctx.fill();
+      }
+    } else if (isPaladin) {
+      // Ranger hood/helmet
+      ctx.fillStyle = outfit.helmetColor;
+      if (facingSouth) {
+        ctx.beginPath();
+        ctx.arc(cx, headY, 7, Math.PI * 1.1, Math.PI * 1.9);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(cx, headY - 1, 7.5, Math.PI, 0);
+        ctx.fill();
+        // Face opening (hood frame)
+        ctx.strokeStyle = '#2a4a1a';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(cx, headY + 1, 5.5, Math.PI * 0.15, Math.PI * 0.85);
+        ctx.stroke();
+        // Green plume/feather
+        ctx.fillStyle = outfit.helmetPlume;
+        ctx.beginPath();
+        ctx.moveTo(cx, headY - 7);
+        ctx.quadraticCurveTo(cx + 7, headY - 13, cx + 3, headY - 15);
+        ctx.quadraticCurveTo(cx, headY - 11, cx - 2, headY - 15);
+        ctx.quadraticCurveTo(cx - 6, headY - 13, cx, headY - 7);
+        ctx.fill();
+      } else if (facingNorth) {
+        ctx.beginPath();
+        ctx.arc(cx, headY, 8, 0, Math.PI);
+        ctx.fill();
+        ctx.fillStyle = outfit.helmetPlume;
+        ctx.beginPath();
+        ctx.moveTo(cx - 3, headY + 2);
+        ctx.quadraticCurveTo(cx - 8, headY - 4, cx, headY - 8);
+        ctx.quadraticCurveTo(cx + 8, headY - 4, cx + 3, headY + 2);
+        ctx.fill();
+      } else {
+        ctx.beginPath();
+        ctx.arc(headX, headY, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = outfit.helmetPlume;
+        ctx.beginPath();
+        ctx.moveTo(headX, headY - 7);
+        ctx.quadraticCurveTo(headX + sideFlip * 9, headY - 13, headX + sideFlip * 4, headY - 15);
+        ctx.fill();
+      }
+    }
+  } else {
+    // Head (skin)
+    ctx.fillStyle = outfit.skinColor;
+    ctx.beginPath();
+    ctx.arc(headX, headY, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Hair
+    ctx.fillStyle = outfit.hairColor;
+    if (facingSouth) {
+      ctx.beginPath();
+      ctx.arc(headX, headY - 1, 6, Math.PI * 1.05, Math.PI * 1.95);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(headX, headY - 2, 6.5, Math.PI, 0);
+      ctx.fill();
+    } else if (facingNorth) {
+      ctx.beginPath();
+      ctx.arc(headX, headY, 7.5, 0, Math.PI);
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.arc(headX, headY - 1, 6.5, Math.PI * 0.7, Math.PI * 2.3);
+      ctx.fill();
+    }
+
+    // Eyes
+    if (facingSouth) {
+      ctx.fillStyle = '#222';
+      ctx.fillRect(headX - 3, headY - 1, 2, 2);
+      ctx.fillRect(headX + 1, headY - 1, 2, 2);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(headX - 2.5, headY - 0.5, 1, 1);
+      ctx.fillRect(headX + 1.5, headY - 0.5, 1, 1);
+      // Mouth
+      ctx.fillStyle = '#c8a080';
+      ctx.fillRect(headX - 1, headY + 2, 2, 0.8);
+    } else if (facingEast) {
+      ctx.fillStyle = '#222';
+      ctx.fillRect(headX + 1, headY - 1, 2, 2);
+    } else if (facingWest) {
+      ctx.fillStyle = '#222';
+      ctx.fillRect(headX - 3, headY - 1, 2, 2);
+    }
+
+    // Sorcerer: Wizard Hat
+    if (effectiveVoc === Vocation.SORCERER) {
+      const hatColor = '#1a0a3a';
+      const hatTrim = '#8a6aff';
+      // Hat brim
+      ctx.fillStyle = hatColor;
+      ctx.beginPath();
+      ctx.ellipse(headX, headY - 5, 10, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Hat cone
+      ctx.beginPath();
+      ctx.moveTo(headX - 7, headY - 5);
+      ctx.lineTo(headX + 2, headY - 18);
+      ctx.lineTo(headX + 7, headY - 5);
+      ctx.fill();
+      // Hat bend (slightly curved tip)
+      ctx.beginPath();
+      ctx.moveTo(headX + 2, headY - 18);
+      ctx.quadraticCurveTo(headX + 6, headY - 20, headX + 5, headY - 16);
+      ctx.fill();
+      // Hat band
+      ctx.fillStyle = hatTrim;
+      ctx.fillRect(headX - 7, headY - 6.5, 14, 2);
+      // Stars on hat
+      ctx.fillStyle = '#DAA52088';
+      ctx.beginPath();
+      ctx.arc(headX - 2, headY - 12, 1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(headX + 3, headY - 9, 0.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(headX - 4, headY - 8, 0.6, 0, Math.PI * 2);
+      ctx.fill();
+      // Hat trim gold edge
+      ctx.strokeStyle = '#DAA52066';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.ellipse(headX, headY - 5, 10, 3, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Druid: Hood with leaf ornament
+    if (effectiveVoc === Vocation.DRUID) {
+      ctx.fillStyle = outfit.bodyDark;
+      if (facingSouth) {
+        ctx.beginPath();
+        ctx.arc(headX, headY + 1, 8, Math.PI * 0.1, Math.PI * 0.9);
+        ctx.fill();
+        // Hood point
+        ctx.beginPath();
+        ctx.moveTo(headX - 7, headY - 2);
+        ctx.lineTo(headX, headY - 10);
+        ctx.lineTo(headX + 7, headY - 2);
+        ctx.fill();
+        // Leaf ornament on hood
+        ctx.fillStyle = '#4a8a2a';
+        ctx.beginPath();
+        ctx.ellipse(headX, headY - 10, 2, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#6aaa3a';
+        ctx.beginPath();
+        ctx.ellipse(headX + 0.5, headY - 11, 1, 2.5, 0.3, 0, Math.PI * 2);
+        ctx.fill();
+        // Vine trim on hood edge
+        ctx.strokeStyle = '#4a8a2a88';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(headX, headY + 1, 7.5, Math.PI * 0.15, Math.PI * 0.85);
+        ctx.stroke();
+      } else if (facingNorth) {
+        ctx.beginPath();
+        ctx.arc(headX, headY, 8, 0, Math.PI);
+        ctx.fill();
+        // Hood point from behind
+        ctx.beginPath();
+        ctx.moveTo(headX - 6, headY - 3);
+        ctx.lineTo(headX, headY - 11);
+        ctx.lineTo(headX + 6, headY - 3);
+        ctx.fill();
+        // Leaf
+        ctx.fillStyle = '#4a8a2a';
+        ctx.beginPath();
+        ctx.ellipse(headX, headY - 11, 2, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.beginPath();
+        ctx.arc(headX, headY, 8, 0, Math.PI);
+        ctx.fill();
+        // Hood point
+        ctx.beginPath();
+        ctx.moveTo(headX - 5, headY - 3);
+        ctx.lineTo(headX, headY - 11);
+        ctx.lineTo(headX + 5, headY - 3);
+        ctx.fill();
+        // Leaf
+        ctx.fillStyle = '#4a8a2a';
+        ctx.beginPath();
+        ctx.ellipse(headX + sideFlip * 1, headY - 11, 2, 4, sideFlip * 0.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  // ---- Draw labels (shared) ----
+  drawPlayerLabels(ctx, cx, y, name, effectiveVoc, level, health, maxHealth);
+}
+
+// =============================================
+// Player name/vocation/health labels (shared by sprite & canvas)
+// =============================================
+function drawPlayerLabels(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  y: number,
+  name: string,
+  vocation: Vocation,
+  level: number,
+  health: number,
+  maxHealth: number,
+) {
+  // Name
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 9px monospace';
   ctx.textAlign = 'center';
   ctx.strokeStyle = '#000';
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 2.5;
   ctx.strokeText(name, cx, y - 8);
   ctx.fillText(name, cx, y - 8);
 
-  ctx.font = '7px monospace';
-  ctx.fillStyle = '#f1c40f';
-  ctx.strokeText(`Lv.${level}`, cx, y - 0);
-  ctx.fillText(`Lv.${level}`, cx, y - 0);
+  // Vocation label with colored background pill
+  if (vocation) {
+    const label = `${vocation} Lv.${level}`;
+    ctx.font = '7px monospace';
+    const vColor = vocation === Vocation.KNIGHT ? '#e74c3c' : vocation === Vocation.SORCERER ? '#9b59b6' : vocation === Vocation.DRUID ? '#2ecc71' : '#f1c40f';
+    const tw = ctx.measureText(label).width;
+    // Pill background
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.beginPath();
+    ctx.roundRect(cx - tw / 2 - 3, y - 5, tw + 6, 10, 3);
+    ctx.fill();
+    // Text
+    ctx.fillStyle = vColor;
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1.5;
+    ctx.strokeText(label, cx, y + 2);
+    ctx.fillText(label, cx, y + 2);
+  } else {
+    ctx.font = '7px monospace';
+    ctx.fillStyle = '#f1c40f';
+    ctx.strokeText(`Lv.${level}`, cx, y + 2);
+    ctx.fillText(`Lv.${level}`, cx, y + 2);
+  }
 
+  // Health bar (shown when damaged)
   if (health < maxHealth) {
-    const barWidth = 28;
+    const barWidth = 30;
     const barHeight = 3;
     const barX = cx - barWidth / 2;
     const barY = y - 3;
-    ctx.fillStyle = '#333';
+    // Background
+    ctx.fillStyle = '#222';
+    ctx.beginPath();
+    ctx.roundRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2, 1);
+    ctx.fill();
+    // Empty bar
+    ctx.fillStyle = '#111';
     ctx.fillRect(barX, barY, barWidth, barHeight);
+    // Health fill
     const hpPercent = health / maxHealth;
     ctx.fillStyle = hpPercent > 0.5 ? '#2ecc71' : hpPercent > 0.25 ? '#f39c12' : '#e74c3c';
     ctx.fillRect(barX, barY, barWidth * hpPercent, barHeight);
+    // Shine
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fillRect(barX, barY, barWidth * hpPercent, 1);
   }
 }
 
@@ -303,6 +1716,7 @@ function drawPlayerSprite(
 function drawMonster(
   ctx: CanvasRenderingContext2D,
   name: string,
+  monsterId: string,
   color: string,
   _icon: string,
   x: number,
@@ -334,12 +1748,12 @@ function drawMonster(
       const sy = cy - spriteSize / 2 - 2;
       ctx.drawImage(img, sx, sy, spriteSize, spriteSize);
     } else {
-      // Fallback to colored rectangle while loading
-      drawMonsterFallback(ctx, cx, cy, color);
+      // Fallback to creature drawing while loading
+      drawMonsterFallback(ctx, cx, cy, color, monsterId, direction);
     }
   } else {
-    // No sprites — draw classic colored monster
-    drawMonsterFallback(ctx, cx, cy, color);
+    // No sprites — draw creature shape
+    drawMonsterFallback(ctx, cx, cy, color, monsterId, direction);
   }
 
   // Hit flash overlay
@@ -354,7 +1768,7 @@ function drawMonster(
         ctx.fillRect(cx - spriteSize / 2, cy - spriteSize / 2 - 2, spriteSize, spriteSize);
       } else {
         ctx.beginPath();
-        ctx.roundRect(cx - 10, cy - 6, 20, 18, 4);
+        ctx.roundRect(cx - 12, cy - 10, 24, 22, 3);
         ctx.fill();
       }
       ctx.globalAlpha = 1.0;
@@ -386,17 +1800,22 @@ function drawMonsterFallback(
   ctx: CanvasRenderingContext2D,
   cx: number,
   cy: number,
-  color: string
+  color: string,
+  monsterId?: string,
+  direction?: Direction
 ) {
+  if (monsterId && direction !== undefined) {
+    drawMonsterCreature(ctx, monsterId, cx, cy, direction);
+    return;
+  }
+  // Ultimate fallback for unknown monsters
   ctx.fillStyle = color;
   ctx.beginPath();
   ctx.roundRect(cx - 10, cy - 6, 20, 18, 4);
   ctx.fill();
-
   ctx.strokeStyle = 'rgba(0,0,0,0.4)';
   ctx.lineWidth = 1;
   ctx.stroke();
-
   ctx.fillStyle = '#ff0000';
   ctx.beginPath();
   ctx.arc(cx - 4, cy, 2, 0, Math.PI * 2);
@@ -996,7 +2415,10 @@ export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastMoveTime = useRef(0);
   const keysPressed = useRef<Set<string>>(new Set());
+  const touchDirection = useRef<Direction | null>(null);
+  const touchAttack = useRef(false);
   const lastFrameTime = useRef(0);
+  const isMobile = useIsMobile();
   const animFrameRef = useRef<number>(0);
 
   const player = useGameStore((s) => s.player);
@@ -1007,6 +2429,7 @@ export default function GameCanvas() {
   const movePlayer = useGameStore((s) => s.movePlayer);
   const attackMonster = useGameStore((s) => s.attackMonster);
   const interactNPC = useGameStore((s) => s.interactNPC);
+  const updateMatchTimer = useGameStore((s) => s.updateMatchTimer);
   const updateMonsters = useGameStore((s) => s.updateMonsters);
   const cleanupDamageNumbers = useGameStore((s) => s.cleanupDamageNumbers);
   const cleanupSpellEffects = useGameStore((s) => s.cleanupSpellEffects);
@@ -1022,7 +2445,9 @@ export default function GameCanvas() {
     const currentPlayer = useGameStore.getState().player;
     const currentMap = useGameStore.getState().gameMap;
     const currentMonsters = useGameStore.getState().monsters;
+    const currentLoot = useGameStore.getState().droppedLoot;
     const currentOthers = useGameStore.getState().otherPlayers;
+    const currentBots = useGameStore.getState().bots;
     const currentDmgNumbers = useGameStore.getState().damageNumbers;
     const currentSpellEffects = useGameStore.getState().spellEffects;
     const currentBuffEnd = useGameStore.getState().buffEndTime;
@@ -1060,19 +2485,21 @@ export default function GameCanvas() {
         const screenX = x * TILE_SIZE - camX;
         const screenY = y * TILE_SIZE - camY;
 
-        ctx.fillStyle = TILE_COLORS[tile] || '#333';
+        // Base color with subtle per-tile variation (darker atmosphere)
+        const baseColor = TILE_COLORS[tile] || '#333';
+        const variation = 0.88 + tileHash(x, y, 999) * 0.24; // 0.88-1.12
+        const r = Math.min(255, Math.max(0, Math.round(parseInt(baseColor.slice(1, 3), 16) * variation)));
+        const g = Math.min(255, Math.max(0, Math.round(parseInt(baseColor.slice(3, 5), 16) * variation)));
+        const b = Math.min(255, Math.max(0, Math.round(parseInt(baseColor.slice(5, 7), 16) * variation)));
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
         ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
-        drawTileDetail(ctx, tile, screenX, screenY);
-      }
-    }
 
-    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-    ctx.lineWidth = 0.5;
-    for (let y = startTileY; y < endTileY; y++) {
-      for (let x = startTileX; x < endTileX; x++) {
-        const screenX = x * TILE_SIZE - camX;
-        const screenY = y * TILE_SIZE - camY;
-        ctx.strokeRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+        // Tibia-style grid lines (1px semi-transparent dark border)
+        ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(screenX + 0.5, screenY + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+
+        drawTileDetail(ctx, tile, screenX, screenY, x, y);
       }
     }
 
@@ -1081,6 +2508,64 @@ export default function GameCanvas() {
       const screenY = npc.position.y * TILE_SIZE - camY;
       if (screenX > -TILE_SIZE && screenX < canvasWidth && screenY > -TILE_SIZE && screenY < canvasHeight) {
         drawNPC(ctx, npc.name, npc.color, npc.icon, screenX, screenY);
+      }
+    }
+
+    // Draw Safe Zone during Arena
+    const matchPhase = useGameStore.getState().matchPhase;
+    if (matchPhase === 'arena') {
+       const safeZoneRadius = useGameStore.getState().safeZoneRadius;
+       const cx = 50 * TILE_SIZE + (TILE_SIZE / 2) - camX;
+       const cy = 50 * TILE_SIZE + (TILE_SIZE / 2) - camY;
+       
+       ctx.save();
+       ctx.strokeStyle = 'rgba(255, 60, 60, 0.7)';
+       ctx.lineWidth = 4;
+       ctx.beginPath();
+       ctx.arc(cx, cy, safeZoneRadius * TILE_SIZE, 0, Math.PI * 2);
+       ctx.stroke();
+       
+       // Fill outer area with red tint
+       ctx.fillStyle = 'rgba(255, 0, 0, 0.15)';
+       ctx.beginPath();
+       ctx.rect(0, 0, canvasWidth, canvasHeight);
+       ctx.arc(cx, cy, safeZoneRadius * TILE_SIZE, 0, Math.PI * 2, true);
+       ctx.fill();
+       
+       ctx.restore();
+    }
+
+    // Draw dropped loot (chests)
+    for (const loot of currentLoot) {
+      const screenX = loot.position.x * TILE_SIZE - camX;
+      const screenY = loot.position.y * TILE_SIZE - camY;
+      
+      if (screenX > -TILE_SIZE && screenX < canvasWidth && screenY > -TILE_SIZE && screenY < canvasHeight) {
+        // Glowing aura
+        const glowPhase = (Date.now() % 2000) / 2000;
+        const radius = (TILE_SIZE / 2) + Math.sin(glowPhase * Math.PI * 2) * 4;
+        
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(screenX + TILE_SIZE / 2, screenY + TILE_SIZE / 2, radius, 0, Math.PI * 2);
+        
+        const grad = ctx.createRadialGradient(
+          screenX + TILE_SIZE / 2, screenY + TILE_SIZE / 2, 0,
+          screenX + TILE_SIZE / 2, screenY + TILE_SIZE / 2, radius
+        );
+        grad.addColorStop(0, 'rgba(255, 215, 0, 0.4)'); // Gold glow
+        grad.addColorStop(1, 'rgba(255, 215, 0, 0)');
+        
+        ctx.fillStyle = grad;
+        ctx.fill();
+        
+        // Chest icon
+        ctx.font = `${TILE_SIZE * 0.7}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('📦', screenX + TILE_SIZE / 2, screenY + TILE_SIZE / 2 + 2);
+        
+        ctx.restore();
       }
     }
 
@@ -1131,7 +2616,7 @@ export default function GameCanvas() {
       const screenX = monster.position.x * TILE_SIZE - camX;
       const screenY = monster.position.y * TILE_SIZE - camY;
       if (screenX > -TILE_SIZE && screenX < canvasWidth && screenY > -TILE_SIZE && screenY < canvasHeight) {
-        drawMonster(ctx, def.name, def.color, def.icon, screenX, screenY, monster.health, monster.maxHealth, def.sprites, monster.direction as Direction, monster.lastHitTime);
+        drawMonster(ctx, def.name, monster.definitionId, def.color, def.icon, screenX, screenY, monster.health, monster.maxHealth, def.sprites, monster.direction as Direction, monster.lastHitTime);
       }
     }
 
@@ -1139,14 +2624,23 @@ export default function GameCanvas() {
       const screenX = other.position.x * TILE_SIZE - camX;
       const screenY = other.position.y * TILE_SIZE - camY;
       if (screenX > -TILE_SIZE && screenX < canvasWidth && screenY > -TILE_SIZE && screenY < canvasHeight) {
-        drawPlayerSprite(ctx, other.name, screenX, screenY, other.direction as Direction, '#3498db', other.level, other.health, other.maxHealth, false);
+        drawPlayerSprite(ctx, other.name, screenX, screenY, other.direction as Direction, '#3498db', other.level, other.health, other.maxHealth, false, other.vocation as Vocation);
+      }
+    }
+
+    // Draw bots
+    for (const bot of currentBots) {
+      const screenX = bot.position.x * TILE_SIZE - camX;
+      const screenY = bot.position.y * TILE_SIZE - camY;
+      if (screenX > -TILE_SIZE && screenX < canvasWidth && screenY > -TILE_SIZE && screenY < canvasHeight) {
+        drawPlayerSprite(ctx, bot.name, screenX, screenY, bot.direction, '#e74c3c', bot.stats.level, bot.stats.health, bot.stats.maxHealth, false, bot.vocation);
       }
     }
 
     const playerScreenX = currentPlayer.position.x * TILE_SIZE - camX;
     const playerScreenY = currentPlayer.position.y * TILE_SIZE - camY;
     const hasBuff = Date.now() < currentBuffEnd;
-    drawPlayerSprite(ctx, currentPlayer.name, playerScreenX, playerScreenY, currentPlayer.direction, '#e67e22', currentPlayer.stats.level, currentPlayer.stats.health, currentPlayer.stats.maxHealth, hasBuff);
+    drawPlayerSprite(ctx, currentPlayer.name, playerScreenX, playerScreenY, currentPlayer.direction, '#e67e22', currentPlayer.stats.level, currentPlayer.stats.health, currentPlayer.stats.maxHealth, hasBuff, currentPlayer.vocation);
 
     // Level up celebration (in-world ring + particles, drawn after player, before spell effects)
     if (levelUpTime > 0) {
@@ -1213,7 +2707,7 @@ export default function GameCanvas() {
   }, []);
 
   // Game loop ref to avoid self-reference
-  const gameLoopRef = useRef<(timestamp: number) => void>();
+  const gameLoopRef = useRef<((timestamp: number) => void) | null>(null);
 
   // Game loop
   const gameLoop = useCallback(
@@ -1227,23 +2721,33 @@ export default function GameCanvas() {
 
       if (now - lastMoveTime.current > delay) {
         let moved = false;
+        let direction: Direction | null = null;
         if (keysPressed.current.has('w') || keysPressed.current.has('arrowup')) {
-          store.movePlayer(Direction.NORTH); moved = true;
+          direction = Direction.NORTH;
         } else if (keysPressed.current.has('s') || keysPressed.current.has('arrowdown')) {
-          store.movePlayer(Direction.SOUTH); moved = true;
+          direction = Direction.SOUTH;
         } else if (keysPressed.current.has('a') || keysPressed.current.has('arrowleft')) {
-          store.movePlayer(Direction.WEST); moved = true;
+          direction = Direction.WEST;
         } else if (keysPressed.current.has('d') || keysPressed.current.has('arrowright')) {
-          store.movePlayer(Direction.EAST); moved = true;
+          direction = Direction.EAST;
+        } else if (touchDirection.current !== null) {
+          direction = touchDirection.current;
+        }
+        if (direction !== null) {
+          store.movePlayer(direction);
+          moved = true;
         }
         if (moved) lastMoveTime.current = now;
       }
 
+      store.updateMatchTimer(deltaTime);
       store.updateMonsters(deltaTime);
+      store.updateLoot(deltaTime);
+      store.updateBots(deltaTime);
       store.regenMana(deltaTime);
 
-      // Auto-attack when holding Space
-      if (keysPressed.current.has(' ')) {
+      // Auto-attack when holding Space or touch attack button
+      if (keysPressed.current.has(' ') || touchAttack.current) {
         const autoAttackDelay = 500; // ms between auto-attacks
         const now = Date.now();
         if (now - store.lastAutoAttackTime > autoAttackDelay) {
@@ -1293,23 +2797,10 @@ export default function GameCanvas() {
       if (key === 'k') { e.preventDefault(); useGameStore.getState().toggleSkillPanel(); }
       if (e.key === 'Escape') { e.preventDefault(); if (useGameStore.getState().showSkillPanel) useGameStore.getState().toggleSkillPanel(); }
 
-      // Q1/Q2 = quick potions
+      // Q = quick potion
       if (key === 'q') {
         e.preventDefault();
-        const s = useGameStore.getState();
-        if (s.player) {
-          // Use HP potion first if hurt, otherwise MP
-          const needHP = s.player.stats.health < s.player.stats.maxHealth * 0.8;
-          const potions = s.player.inventory.filter(i =>
-            needHP ? i.itemId.startsWith('health_potion') : i.itemId.startsWith('mana_potion')
-          ).sort((a, b) => {
-            const order = needHP
-              ? ['health_potion_large', 'health_potion_medium', 'health_potion_small']
-              : ['mana_potion_large', 'mana_potion_medium', 'mana_potion_small'];
-            return order.indexOf(a.itemId) - order.indexOf(b.itemId);
-          });
-          if (potions.length > 0) s.consumeInventoryItem(potions[0].id);
-        }
+        useGameStore.getState().quickUsePotion();
       }
 
       // 1-9 = use inventory items
@@ -1434,11 +2925,19 @@ export default function GameCanvas() {
   }, []);
 
   return (
-    <canvas
-      ref={canvasRef}
-      onClick={handleCanvasClick}
-      className="w-full h-full cursor-crosshair"
-      style={{ imageRendering: 'pixelated' }}
-    />
+    <div className="relative w-full h-full">
+      <canvas
+        ref={canvasRef}
+        onClick={handleCanvasClick}
+        className="w-full h-full cursor-crosshair"
+        style={{ imageRendering: 'pixelated' }}
+      />
+      {isMobile && (
+        <MobileControls
+          touchDirection={touchDirection}
+          touchAttack={touchAttack}
+        />
+      )}
+    </div>
   );
 }

@@ -3,13 +3,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useGameStore } from '@/store/game-store';
 import { ChatMessage } from '@/lib/game/types';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function ChatPanel() {
   const chatMessages = useGameStore((s) => s.chatMessages);
   const addChatMessage = useGameStore((s) => s.addChatMessage);
   const player = useGameStore((s) => s.player);
+  const isMobile = useIsMobile();
   const [input, setInput] = useState('');
-  const [isOpen, setIsOpen] = useState(true);
+  const [openOverride, setOpenOverride] = useState<boolean | null>(null);
+  const isOpen = openOverride ?? !isMobile;
+  const setIsOpen = (open: boolean) => setOpenOverride(open);
   const [chatTab, setChatTab] = useState<'all' | 'combat' | 'system'>('all');
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -59,7 +63,11 @@ export default function ChatPanel() {
   };
 
   return (
-    <div className={`absolute bottom-0 left-0 z-20 transition-all duration-200 ${isOpen ? 'w-80' : 'w-48'}`}>
+    <div
+      className={`absolute z-20 transition-all duration-200 ${isOpen ? 'w-80' : 'w-48'} ${
+        isMobile ? 'top-36 left-0' : 'bottom-0 left-0'
+      }`}
+    >
       {/* Chat tabs */}
       <div className="flex items-center bg-black/90 border border-amber-700/50 border-b-0 rounded-t-lg">
         <button

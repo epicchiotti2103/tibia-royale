@@ -1,0 +1,17 @@
+{
+  "name": "Tibia Royale",
+  "short_name": "Tibia Royale",
+  "description": "A classic Tibia-style Battle Royale MMORPG.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "192x192 512x512",
+      "type": "image/x-icon"
+    }
+  ]
+}
