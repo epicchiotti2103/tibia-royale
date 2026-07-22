@@ -733,10 +733,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    // Can't enter town while in combat (5s since last fight action)
-    const { lastCombatTime } = get();
-    if (isInTown(newX, newY) && Date.now() - lastCombatTime < 5000) {
-      addChatMessage({ type: 'system', sender: 'System', content: "⚠️ You can't enter town while in combat! (wait 5s)", color: '#e74c3c' });
+    // Can't enter safe zone while in combat (5s since last fight action)
+    const { lastCombatTime, matchPhase } = get();
+    const isEnteringTown = isInTown(newX, newY) && !isInTown(player.position.x, player.position.y);
+    if (isEnteringTown && matchPhase !== 'arena' && Date.now() - lastCombatTime < 5000) {
+      addChatMessage({ type: 'system', sender: 'System', content: "⚠️ You can't enter safe zone while in combat! (wait 5s)", color: '#e74c3c' });
       return;
     }
 
@@ -774,9 +775,15 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   attackMonster: () => {
-    const { player, monsters, bots, addDamageNumber, addChatMessage, addToInventory } = get();
+    const { player, monsters, bots, matchPhase, addDamageNumber, addChatMessage, botDamageMap, addSpellEffect } = get();
     if (!player) return;
+    
+    if (matchPhase !== 'arena' && isInTown(player.position.x, player.position.y)) {
+       addChatMessage({ type: 'system', sender: 'System', content: "🛡️ You cannot attack in the Protection Zone.", color: '#e67e22' });
+       return;
+    }
 
+    const now = Date.now();
     // Find target in front of player
     const dx = player.direction === Direction.EAST ? 1 : player.direction === Direction.WEST ? -1 : 0;
     const dy = player.direction === Direction.SOUTH ? 1 : player.direction === Direction.NORTH ? -1 : 0;
@@ -1128,13 +1135,18 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   castSkill: (hotkeyIndex) => {
-    const { player, monsters, addDamageNumber, addChatMessage, addSpellEffect, skillCooldowns, buffEndTime, addToInventory, equippedSkillIds } = get();
+    const { player, monsters, matchPhase, addDamageNumber, addChatMessage, addSpellEffect, skillCooldowns, buffEndTime, addToInventory, equippedSkillIds } = get();
     if (!player) return;
 
     const skillId = equippedSkillIds[hotkeyIndex];
     if (!skillId) return;
     const skill = getSkill(skillId);
     if (!skill) return;
+
+    if (skill.type !== 'heal' && skill.type !== 'buff' && matchPhase !== 'arena' && isInTown(player.position.x, player.position.y)) {
+       addChatMessage({ type: 'system', sender: 'System', content: "🛡️ You cannot cast offensive spells in the Protection Zone.", color: '#e67e22' });
+       return;
+    }
 
     const { skillUpgrades } = get();
     const upgradeLevel = skillUpgrades[skill.id] || 0;
