@@ -25,7 +25,7 @@ const BOT_NAMES = [
   'PewPew', 'Goku123', 'DarkKnight', 'Asuna', 'Kirito'
 ];
 
-export function generateBots(count: number, spawnPoint: Position, riskyRatio: number = 0.5): BotInstance[] {
+export function generateBots(count: number, spawnPoint: Position, riskyRatio: number = 0.5, looterRatio: number = 0.3): BotInstance[] {
   const bots: BotInstance[] = [];
   const vocations: Vocation[] = ['Knight', 'Sorcerer', 'Paladin', 'Druid'];
   const strategies: ('aggressive' | 'cautious' | 'looter')[] = ['aggressive', 'cautious', 'looter'];
@@ -65,7 +65,7 @@ export function generateBots(count: number, spawnPoint: Position, riskyRatio: nu
       fleeThreshold: 0.2 + Math.random() * 0.2, // between 20% and 40%
       huntingRisk: Math.random() < riskyRatio ? 'risky' : 'safe',
       attackRange,
-      isLooter: Math.random() < 0.3 // 30% chance to be a loot goblin
+      isLooter: Math.random() < looterRatio
     });
   }
 

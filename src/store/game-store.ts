@@ -402,7 +402,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   spawnBots: (count) => {
     const map = get().gameMap;
     const matchRiskyRatio = 0.2 + Math.random() * 0.3; // 20% to 50%
-    const bots = generateBots(count, map.spawnPoint, matchRiskyRatio);
+    const matchLooterRatio = 0.1 + Math.random() * 0.3; // 10% to 40%
+    const bots = generateBots(count, map.spawnPoint, matchRiskyRatio, matchLooterRatio);
     set({ bots });
   },
   
@@ -555,6 +556,9 @@ export const useGameStore = create<GameState>((set, get) => ({
                      } else if (closestTarget.type === 'loot') {
                         // Pick up loot!
                         set(s => ({ droppedLoot: s.droppedLoot.filter(l => l.id !== closestTarget!.id) }));
+                        newBot.stats.attack += 1; // Slight buff from "equipping" stolen loot
+                        newBot.stats.maxHealth += 5;
+                        addDamageNumber({ x: closestTarget.x, y: closestTarget.y }, 0, 'heal'); // small green effect
                      }
                  }
               }
