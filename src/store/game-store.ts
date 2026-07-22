@@ -573,6 +573,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
       if (botUpdated) updated = true;
       return botUpdated ? newBot : bot;
+    });
 
     if (updated || botDamageMap.size > 0) {
         // Apply damage to bots
