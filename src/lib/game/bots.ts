@@ -8,13 +8,14 @@ export interface BotInstance {
   direction: Direction;
   stats: PlayerStats;
   targetId?: string; // monster or player
-  targetType?: 'monster' | 'player' | 'bot';
+  targetType?: 'monster' | 'player' | 'bot' | 'loot';
   lastActionTime: number;
   strategy: 'aggressive' | 'cautious' | 'looter';
   fleeThreshold: number; // 0.2 to 0.4
   huntingRisk: 'safe' | 'risky';
   attackRange: number;
   lastHealTime?: number;
+  isLooter: boolean;
 }
 
 const BOT_NAMES = [
@@ -24,7 +25,7 @@ const BOT_NAMES = [
   'PewPew', 'Goku123', 'DarkKnight', 'Asuna', 'Kirito'
 ];
 
-export function generateBots(count: number, spawnPoint: Position): BotInstance[] {
+export function generateBots(count: number, spawnPoint: Position, riskyRatio: number = 0.5): BotInstance[] {
   const bots: BotInstance[] = [];
   const vocations: Vocation[] = ['Knight', 'Sorcerer', 'Paladin', 'Druid'];
   const strategies: ('aggressive' | 'cautious' | 'looter')[] = ['aggressive', 'cautious', 'looter'];
@@ -62,8 +63,9 @@ export function generateBots(count: number, spawnPoint: Position): BotInstance[]
       lastActionTime: Date.now(),
       strategy,
       fleeThreshold: 0.2 + Math.random() * 0.2, // between 20% and 40%
-      huntingRisk: Math.random() > 0.5 ? 'safe' : 'risky',
-      attackRange
+      huntingRisk: Math.random() < riskyRatio ? 'risky' : 'safe',
+      attackRange,
+      isLooter: Math.random() < 0.3 // 30% chance to be a loot goblin
     });
   }
 

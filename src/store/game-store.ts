@@ -401,7 +401,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   bots: [],
   spawnBots: (count) => {
     const map = get().gameMap;
-    const bots = generateBots(count, map.spawnPoint);
+    const matchRiskyRatio = 0.2 + Math.random() * 0.3; // 20% to 50%
+    const bots = generateBots(count, map.spawnPoint, matchRiskyRatio);
     set({ bots });
   },
   
@@ -458,7 +459,21 @@ export const useGameStore = create<GameState>((set, get) => ({
                  }
              }
           } else if (matchPhase === 'hunting') {
-             // PvE Mode: Target Monsters
+             // PvE Mode: Target Monsters or Loot
+             
+             // 1. If bot is a looter, scan for dropped loot
+             if (bot.isLooter) {
+                 const droppedLoot = get().droppedLoot;
+                 for (const loot of droppedLoot) {
+                     const dist = Math.abs(loot.position.x - bot.position.x) + Math.abs(loot.position.y - bot.position.y);
+                     if (dist < minDistance && dist < 15) { // Only care if it's somewhat close
+                         minDistance = dist - 50; // Massively prioritize loot over monsters
+                         closestTarget = { id: loot.id, x: loot.position.x, y: loot.position.y, type: 'loot' };
+                     }
+                 }
+             }
+
+             // 2. Scan Monsters
              const monstersList = get().monsters;
              for (const m of monstersList) {
                  if (m.isDead) continue;
@@ -537,6 +552,9 @@ export const useGameStore = create<GameState>((set, get) => ({
                             return m;
                         });
                         set({ monsters: ml });
+                     } else if (closestTarget.type === 'loot') {
+                        // Pick up loot!
+                        set(s => ({ droppedLoot: s.droppedLoot.filter(l => l.id !== closestTarget!.id) }));
                      }
                  }
               }
