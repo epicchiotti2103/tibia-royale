@@ -322,7 +322,7 @@ export interface VocationStats {
 
 export const VOCATION_STATS: Record<Vocation, VocationStats> = {
   [Vocation.KNIGHT]: {
-    baseHealth: 110,
+    baseHealth: 210,
     healthPerLevel: 18,
     baseMana: 40,
     manaPerLevel: 10,
@@ -337,7 +337,7 @@ export const VOCATION_STATS: Record<Vocation, VocationStats> = {
     baseSpeed: 3.5,
   },
   [Vocation.SORCERER]: {
-    baseHealth: 90,
+    baseHealth: 190,
     healthPerLevel: 14,
     baseMana: 200,
     manaPerLevel: 40,
@@ -352,7 +352,7 @@ export const VOCATION_STATS: Record<Vocation, VocationStats> = {
     baseSpeed: 3,
   },
   [Vocation.DRUID]: {
-    baseHealth: 100,
+    baseHealth: 200,
     healthPerLevel: 16,
     baseMana: 120,
     manaPerLevel: 28,
@@ -367,7 +367,7 @@ export const VOCATION_STATS: Record<Vocation, VocationStats> = {
     baseSpeed: 3.5,
   },
   [Vocation.PALADIN]: {
-    baseHealth: 120,
+    baseHealth: 220,
     healthPerLevel: 18,
     baseMana: 60,
     manaPerLevel: 15,

@@ -38,7 +38,7 @@ export const SKILLS: SkillDef[] = [
     range: 1,
     vocation: [Vocation.KNIGHT],
     levelReq: 5,
-    damage: 18,
+    damage: 10,
     color: '#e74c3c',
   },
   {
@@ -52,7 +52,7 @@ export const SKILLS: SkillDef[] = [
     range: 2,
     vocation: [Vocation.KNIGHT],
     levelReq: 15,
-    damage: 35,
+    damage: 18,
     color: '#c0392b',
   },
   {
@@ -93,7 +93,7 @@ export const SKILLS: SkillDef[] = [
     range: 1,
     vocation: [Vocation.KNIGHT],
     levelReq: 20,
-    damage: 50,
+    damage: 25,
     color: '#a93226',
   },
   {
@@ -124,7 +124,7 @@ export const SKILLS: SkillDef[] = [
     range: 6,
     vocation: [Vocation.SORCERER],
     levelReq: 1,
-    damage: 100,
+    damage: 35,
     color: '#e74c3c',
   },
   {
@@ -138,7 +138,7 @@ export const SKILLS: SkillDef[] = [
     range: 7,
     vocation: [Vocation.SORCERER],
     levelReq: 8,
-    damage: 200,
+    damage: 55,
     color: '#f1c40f',
   },
   {
@@ -152,7 +152,7 @@ export const SKILLS: SkillDef[] = [
     range: 9,
     vocation: [Vocation.SORCERER],
     levelReq: 15,
-    damage: 400,
+    damage: 80,
     color: '#9b59b6',
   },
   {
@@ -166,7 +166,7 @@ export const SKILLS: SkillDef[] = [
     range: 3,
     vocation: [Vocation.SORCERER],
     levelReq: 5,
-    damage: 80,
+    damage: 30,
     color: '#00bcd4',
   },
   {
@@ -180,7 +180,7 @@ export const SKILLS: SkillDef[] = [
     range: 5,
     vocation: [Vocation.SORCERER],
     levelReq: 22,
-    damage: 600,
+    damage: 120,
     color: '#ff5722',
   },
   {
@@ -239,7 +239,7 @@ export const SKILLS: SkillDef[] = [
     range: 3,
     vocation: [Vocation.DRUID],
     levelReq: 12,
-    damage: 60,
+    damage: 30,
     color: '#8B4513',
   },
   {
@@ -266,7 +266,7 @@ export const SKILLS: SkillDef[] = [
     range: 4,
     vocation: [Vocation.DRUID],
     levelReq: 18,
-    damage: 120,
+    damage: 50,
     color: '#1b5e20',
   },
   {
@@ -298,7 +298,7 @@ export const SKILLS: SkillDef[] = [
     range: 6,
     vocation: [Vocation.PALADIN],
     levelReq: 1,
-    damage: 30,
+    damage: 20,
     color: '#f1c40f',
   },
   {
@@ -312,7 +312,7 @@ export const SKILLS: SkillDef[] = [
     range: 1,
     vocation: [Vocation.PALADIN],
     levelReq: 8,
-    damage: 50,
+    damage: 25,
     color: '#ecf0f1',
   },
   {
@@ -340,7 +340,7 @@ export const SKILLS: SkillDef[] = [
     range: 5,
     vocation: [Vocation.PALADIN],
     levelReq: 12,
-    damage: 40,
+    damage: 20,
     color: '#ff9800',
   },
   {
@@ -354,7 +354,7 @@ export const SKILLS: SkillDef[] = [
     range: 7,
     vocation: [Vocation.PALADIN],
     levelReq: 20,
-    damage: 120,
+    damage: 45,
     color: '#ffeb3b',
   },
   {
