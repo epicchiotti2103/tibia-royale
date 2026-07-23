@@ -68,8 +68,14 @@ export default function GameLogin() {
   useEffect(() => {
     fetch('/api/characters')
       .then(r => r.json())
-      .then(setSavedChars)
-      .catch(() => {});
+      .then(data => {
+        if (Array.isArray(data)) {
+          setSavedChars(data);
+        } else {
+          setSavedChars([]);
+        }
+      })
+      .catch(() => { setSavedChars([]); });
   }, []);
 
   const handleStartGame = (e?: React.SyntheticEvent) => {
