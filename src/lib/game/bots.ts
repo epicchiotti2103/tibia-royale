@@ -15,6 +15,7 @@ export interface BotInstance {
   fleeThreshold: number; // 0.2 to 0.4
   huntingRisk: 'safe' | 'risky';
   attackRange: number;
+  spellCastChance: number; // dynamically assigned based on vocation
   lastHealTime?: number;
   isLooter: boolean;
 }
@@ -42,6 +43,16 @@ export function generateBots(count: number, spawnPoint: Position, riskyRatio: nu
     const vocation = vocations[Math.floor(Math.random() * vocations.length)];
     const strategy = strategies[Math.floor(Math.random() * strategies.length)];
     const attackRange = vocation === 'Knight' ? 1 : (vocation === 'Paladin' ? 4 : 5);
+    
+    // Dynamic spell cast chance logic depending on vocation
+    let spellCastChance = 0.1;
+    if (vocation === 'Sorcerer' || vocation === 'Druid') {
+       spellCastChance = 0.5 + Math.random() * 0.4; // 50% to 90%
+    } else if (vocation === 'Paladin') {
+       spellCastChance = 0.3 + Math.random() * 0.3; // 30% to 60%
+    } else if (vocation === 'Knight') {
+       spellCastChance = 0.1 + Math.random() * 0.2; // 10% to 30%
+    }
 
     bots.push({
       id: `bot_${Date.now()}_${i}`,
@@ -59,6 +70,7 @@ export function generateBots(count: number, spawnPoint: Position, riskyRatio: nu
       fleeThreshold: 0.2 + Math.random() * 0.2, // between 20% and 40%
       huntingRisk: Math.random() < riskyRatio ? 'risky' : 'safe',
       attackRange,
+      spellCastChance,
       isLooter: Math.random() < looterRatio
     });
   }

@@ -527,13 +527,14 @@ export const useGameStore = create<GameState>((set, get) => ({
                   newBot.lastAttackTime = now;
                   botUpdated = true;
                   
-                  // 30% chance to cast a skill if they have enough mana
+                  // Dynamic chance to cast a skill based on vocation
                   let spellCast = false;
                   let spellDamage = 0;
                   let effect = bot.attackRange > 1 ? 'projectile' : 'sword_slash';
                   let spellColor = '#e74c3c';
                   
-                  if (Math.random() < 0.3) {
+                  // Use the bot's specific spellCastChance (Sorcerers cast more often than Knights)
+                  if (Math.random() < (bot.spellCastChance || 0.3)) {
                       const skills = getSkillsForVocation(bot.vocation).filter(s => s.type === 'attack');
                       if (skills.length > 0) {
                           const skill = skills[Math.floor(Math.random() * skills.length)];
