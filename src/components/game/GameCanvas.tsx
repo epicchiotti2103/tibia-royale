@@ -16,6 +16,7 @@ import {
   Vocation,
 } from '@/lib/game/types';
 import { MONSTERS } from '@/lib/game/monsters';
+import { ITEMS } from '@/lib/game/items';
 import { drawMonsterCreature } from '@/lib/game/monster-drawings';
 
 // =============================================
