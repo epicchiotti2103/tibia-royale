@@ -201,32 +201,46 @@ export const SKILLS: SkillDef[] = [
   // DRUID SKILLS (6 total - healer/support/AoE)
   // =============================================
   {
+    id: 'ice_strike',
+    name: 'Ice Strike',
+    description: 'A quick blast of freezing ice.',
+    icon: '❄️',
+    manaCost: 15,
+    cooldown: 800,
+    type: 'attack',
+    range: 6,
+    vocation: [Vocation.DRUID],
+    levelReq: 1,
+    damage: 25,
+    color: '#00bcd4',
+  },
+  {
     id: 'heal',
     name: 'Heal',
     description: 'Restore health with the power of nature.',
     icon: '💚',
-    manaCost: 15,
+    manaCost: 20,
     cooldown: 1500,
     type: 'heal',
     range: 0,
     vocation: [Vocation.DRUID],
-    levelReq: 1,
-    healAmount: 80,
+    levelReq: 5,
+    healAmount: 100,
     color: '#2ecc71',
   },
   {
-    id: 'heal_area',
-    name: "Nature's Blessing",
-    description: 'Powerful healing spell restoring significant health.',
-    icon: '🌿',
-    manaCost: 40,
-    cooldown: 4500,
-    type: 'heal',
-    range: 0,
+    id: 'earth_strike',
+    name: 'Earth Strike',
+    description: 'Hurl a heavy boulder at the enemy.',
+    icon: '🪨',
+    manaCost: 30,
+    cooldown: 1500,
+    type: 'attack',
+    range: 5,
     vocation: [Vocation.DRUID],
     levelReq: 8,
-    healAmount: 200,
-    color: '#27ae60',
+    damage: 40,
+    color: '#795548',
   },
   {
     id: 'earthquake',
@@ -241,19 +255,6 @@ export const SKILLS: SkillDef[] = [
     levelReq: 12,
     damage: 30,
     color: '#8B4513',
-  },
-  {
-    id: 'thorns',
-    name: 'Thorn Shield',
-    description: 'Surround yourself with thorns that damage attackers.',
-    icon: '🌵',
-    manaCost: 20,
-    cooldown: 15000,
-    type: 'buff',
-    range: 0,
-    vocation: [Vocation.DRUID],
-    levelReq: 5,
-    color: '#4caf50',
   },
   {
     id: 'nature_wrath',
@@ -394,11 +395,13 @@ export function getSkillEffectType(skillId: string): 'sword_slash' | 'projectile
     case 'holy_arrow':
     case 'divine_strike':
     case 'divine_judgment':
+    case 'ice_strike':
       return 'projectile';
     case 'lightning':
     case 'meteor':
       return 'lightning';
     case 'earthquake':
+    case 'earth_strike':
     case 'nature_wrath':
       return 'earthquake';
     case 'war_cry':
