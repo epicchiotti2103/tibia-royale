@@ -106,6 +106,16 @@ export default function InventoryPanel() {
                       {invItem.quantity > 1 && (
                         <span className="absolute -bottom-1 -right-1 bg-black text-[10px] font-bold text-yellow-400 px-1 rounded-full border border-yellow-700">{invItem.quantity}</span>
                       )}
+                      {/* Main stat overlay */}
+                      {itemDef.attack ? (
+                        <span className="absolute top-0.5 right-0.5 text-[9px] font-bold text-orange-400 bg-black/70 px-1 rounded shadow">
+                          ⚔️{itemDef.attack}
+                        </span>
+                      ) : itemDef.defense ? (
+                        <span className="absolute top-0.5 right-0.5 text-[9px] font-bold text-gray-300 bg-black/70 px-1 rounded shadow">
+                          🛡️{itemDef.defense}
+                        </span>
+                      ) : null}
                     </button>
                   );
                 })}
@@ -206,6 +216,16 @@ export default function InventoryPanel() {
                       <span className="absolute -top-0.5 -left-0.5 text-[8px] text-gray-500 bg-black/80 px-0.5 rounded">
                         {index + 1}
                       </span>
+                      {/* Main stat overlay */}
+                      {itemDef.attack ? (
+                        <span className="absolute top-0.5 right-0.5 text-[8px] font-bold text-orange-400 bg-black/80 px-1 rounded shadow">
+                          ⚔️{itemDef.attack}
+                        </span>
+                      ) : itemDef.defense ? (
+                        <span className="absolute top-0.5 right-0.5 text-[8px] font-bold text-gray-300 bg-black/80 px-1 rounded shadow">
+                          🛡️{itemDef.defense}
+                        </span>
+                      ) : null}
                     </button>
                     {/* Tooltip on hover */}
                     <div className="hidden group-hover:block">

@@ -146,35 +146,31 @@ export default function GameHUD() {
           </div>
         </div>
 
-        {/* Quick Stats - compact (Hidden on Mobile) */}
-        {!isMobile && (
-          <div className="bg-black/80 border border-amber-700/50 rounded-lg p-2 pointer-events-auto text-xs">
-            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-gray-300">
-              <div>⚔️ Atk: <span className="text-orange-400 font-bold">{totalAttack}</span></div>
-              <div>🛡️ Def: <span className="text-gray-200 font-bold">{totalDefense}</span></div>
-              <div>🔮 Mag: <span className="text-purple-400 font-bold">{totalMagicAtk}</span></div>
-              <div>✨ Mdf: <span className="text-blue-400 font-bold">{totalMagicDef}</span></div>
-            </div>
+        {/* Quick Stats - compact */}
+        <div className="bg-black/80 border border-amber-700/50 rounded-lg p-2 pointer-events-auto text-[10px] md:text-xs">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-gray-300">
+            <div>⚔️ Atk: <span className="text-orange-400 font-bold">{totalAttack}</span></div>
+            <div>🛡️ Def: <span className="text-gray-200 font-bold">{totalDefense}</span></div>
+            <div>🔮 Mag: <span className="text-purple-400 font-bold">{totalMagicAtk}</span></div>
+            <div>✨ Mdf: <span className="text-blue-400 font-bold">{totalMagicDef}</span></div>
           </div>
-        )}
+        </div>
 
-        {/* Gold & Save (Hidden on Mobile) */}
-        {!isMobile && (
-          <div className="bg-black/80 border border-amber-700/50 rounded-lg px-3 py-2 pointer-events-auto flex items-center gap-2">
-            <div className="text-yellow-400 font-bold text-sm">🪙 {player.gold}</div>
-            <button
-              onClick={handleSave}
-              className={`text-xs px-2 py-1 rounded border transition-all ${
-                saveFlash
-                  ? 'bg-green-800/60 border-green-500/50 text-green-300'
-                  : 'bg-gray-800 border-gray-600 text-gray-400 hover:text-white hover:border-amber-500'
+        {/* Gold & Save */}
+        <div className="bg-black/80 border border-amber-700/50 rounded-lg px-2 py-1.5 md:px-3 md:py-2 pointer-events-auto flex items-center justify-between gap-2">
+          <div className="text-yellow-400 font-bold text-xs md:text-sm">🪙 {player.gold}</div>
+          <button
+            onClick={handleSave}
+            className={`text-[10px] md:text-xs px-2 py-1 rounded border transition-all ${
+              saveFlash
+                ? 'bg-green-800/60 border-green-500/50 text-green-300'
+                : 'bg-gray-800 border-gray-600 text-gray-400 hover:text-white hover:border-amber-500'
               }`}
               title="Save character (also auto-saves every 30s)"
             >
               💾 {saveFlash ? 'Saved!' : 'Save'}
             </button>
           </div>
-        )}
         {/* Match Timer */}
         <div className="bg-black/90 border-2 border-red-900/80 rounded-lg px-4 py-2 pointer-events-auto flex flex-col items-center justify-center min-w-[120px]">
           {matchPhase === 'arena' && (
