@@ -564,13 +564,20 @@ export const useGameStore = create<GameState>((set, get) => ({
               let dx = Math.sign(closestTarget.x - bot.position.x);
               let dy = Math.sign(closestTarget.y - bot.position.y);
 
+              const isOccupied = (nx: number, ny: number) => {
+                  if (player && player.stats.health > 0 && player.position.x === nx && player.position.y === ny) return true;
+                  if (bots.some(b => b.id !== bot.id && b.stats.health > 0 && b.position.x === nx && b.position.y === ny)) return true;
+                  if (get().monsters.some(m => !m.isDead && m.position.x === nx && m.position.y === ny)) return true;
+                  return false;
+              };
+
               if (canMove) {
                   if (isFleeing || (bot.attackRange > 1 && trueDist <= 2)) {
                      dx = -dx; 
                      dy = -dy;
                      const nx = bot.position.x + dx;
                      const ny = bot.position.y + dy;
-                     if (!isPositionBlocked(nx, ny, gameMap)) {
+                     if (!isPositionBlocked(nx, ny, gameMap) && !isOccupied(nx, ny)) {
                          newBot.position = { x: nx, y: ny };
                          newBot.lastMoveTime = now;
                          botUpdated = true;
@@ -578,15 +585,15 @@ export const useGameStore = create<GameState>((set, get) => ({
                   } else if (trueDist > bot.attackRange) {
                      const nx = bot.position.x + dx;
                      const ny = bot.position.y + dy;
-                     if (!isPositionBlocked(nx, ny, gameMap)) {
+                     if (!isPositionBlocked(nx, ny, gameMap) && !isOccupied(nx, ny)) {
                          newBot.position = { x: nx, y: ny };
                          newBot.lastMoveTime = now;
                          botUpdated = true;
-                     } else if (dx !== 0 && !isPositionBlocked(bot.position.x + dx, bot.position.y, gameMap)) {
+                     } else if (dx !== 0 && !isPositionBlocked(bot.position.x + dx, bot.position.y, gameMap) && !isOccupied(bot.position.x + dx, bot.position.y)) {
                          newBot.position = { x: bot.position.x + dx, y: bot.position.y };
                          newBot.lastMoveTime = now;
                          botUpdated = true;
-                     } else if (dy !== 0 && !isPositionBlocked(bot.position.x, bot.position.y + dy, gameMap)) {
+                     } else if (dy !== 0 && !isPositionBlocked(bot.position.x, bot.position.y + dy, gameMap) && !isOccupied(bot.position.x, bot.position.y + dy)) {
                          newBot.position = { x: bot.position.x, y: bot.position.y + dy };
                          newBot.lastMoveTime = now;
                          botUpdated = true;
@@ -879,7 +886,16 @@ export const useGameStore = create<GameState>((set, get) => ({
           const dir = dirs[Math.floor(Math.random() * dirs.length)];
           const newX = monster.position.x + dir.x;
           const newY = monster.position.y + dir.y;
+          
+          const isOccupied = (nx: number, ny: number) => {
+              if (player && player.stats.health > 0 && player.position.x === nx && player.position.y === ny) return true;
+              if (bots.some(b => b.stats.health > 0 && b.position.x === nx && b.position.y === ny)) return true;
+              if (monsters.some(m => !m.isDead && m.id !== monster.id && m.position.x === nx && m.position.y === ny)) return true;
+              return false;
+          };
+
           if (!isPositionBlocked(newX, newY, gameMap) &&
+              !isOccupied(newX, newY) &&
               Math.abs(newX - monster.spawnPosition.x) < 8 &&
               Math.abs(newY - monster.spawnPosition.y) < 8 &&
               !isInTown(newX, newY)) {
@@ -941,6 +957,16 @@ export const useGameStore = create<GameState>((set, get) => ({
         }
       }
       return turnPlayer();
+    }
+
+    // Bot collision (don't walk on bots)
+    const { bots } = get();
+    const blockingBot = bots.find(b => b.stats.health > 0 && b.position.x === newX && b.position.y === newY);
+    if (blockingBot) {
+        if (Math.abs(blockingBot.position.x - player.position.x) <= 1 && Math.abs(blockingBot.position.y - player.position.y) <= 1) {
+          addChatMessage({ type: 'system', sender: 'System', content: `Player ${blockingBot.name} is blocking your way!`, color: '#e67e22' });
+        }
+        return turnPlayer();
     }
 
     // Can't enter safe zone while in combat (5s since last fight action)
