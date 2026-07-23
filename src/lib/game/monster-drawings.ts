@@ -1221,7 +1221,7 @@ function drawGolem(ctx: Ctx, cx: number, cy: number, direction: Direction) {
   // Large rocky body
   ctx.fillStyle = '#5A5A5A';
   ctx.beginPath();
-  ctx.roundRect(cx - 10, cy - 4, 20, 18, 4);
+  ctx.rect(cx - 10, cy - 4, 20, 18);
   ctx.fill();
 
   // Rock texture
@@ -1233,7 +1233,7 @@ function drawGolem(ctx: Ctx, cx: number, cy: number, direction: Direction) {
   // Head (blocky)
   ctx.fillStyle = '#4A4A4A';
   ctx.beginPath();
-  ctx.roundRect(cx - 6, cy - 12, 12, 10, 2);
+  ctx.rect(cx - 6, cy - 12, 12, 10);
   ctx.fill();
 
   // Glowing eyes
@@ -2725,11 +2725,11 @@ function drawStoneGolem(ctx: Ctx, cx: number, cy: number, direction: Direction) 
   // Large rectangular body
   ctx.fillStyle = '#4A4A4A';
   ctx.beginPath();
-  ctx.roundRect(cx - 11, cy - 4, 22, 20, 3);
+  ctx.rect(cx - 11, cy - 4, 22, 20);
   ctx.fill();
   ctx.fillStyle = '#696969';
   ctx.beginPath();
-  ctx.roundRect(cx - 10, cy - 3, 20, 18, 2);
+  ctx.rect(cx - 10, cy - 3, 20, 18);
   ctx.fill();
 
   // Rock texture patches
@@ -2773,11 +2773,11 @@ function drawStoneGolem(ctx: Ctx, cx: number, cy: number, direction: Direction) 
   // Blocky head
   ctx.fillStyle = '#4A4A4A';
   ctx.beginPath();
-  ctx.roundRect(cx - 7, cy - 14, 14, 12, 2);
+  ctx.rect(cx - 7, cy - 14, 14, 12);
   ctx.fill();
   ctx.fillStyle = '#555';
   ctx.beginPath();
-  ctx.roundRect(cx - 6, cy - 13, 12, 10, 1);
+  ctx.rect(cx - 6, cy - 13, 12, 10);
   ctx.fill();
 
   // Blue glowing eyes
