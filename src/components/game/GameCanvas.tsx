@@ -1671,7 +1671,7 @@ function drawPlayerLabels(
     // Pill background
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     ctx.beginPath();
-    ctx.roundRect(cx - tw / 2 - 3, y - 5, tw + 6, 10, 3);
+    ctx.rect(cx - tw / 2 - 3, y - 5, tw + 6, 10);
     ctx.fill();
     // Text
     ctx.fillStyle = vColor;
@@ -1695,7 +1695,7 @@ function drawPlayerLabels(
     // Background
     ctx.fillStyle = '#222';
     ctx.beginPath();
-    ctx.roundRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2, 1);
+    ctx.rect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
     ctx.fill();
     // Empty bar
     ctx.fillStyle = '#111';
@@ -1768,7 +1768,7 @@ function drawMonster(
         ctx.fillRect(cx - spriteSize / 2, cy - spriteSize / 2 - 2, spriteSize, spriteSize);
       } else {
         ctx.beginPath();
-        ctx.roundRect(cx - 12, cy - 10, 24, 22, 3);
+        ctx.rect(cx - 12, cy - 10, 24, 22);
         ctx.fill();
       }
       ctx.globalAlpha = 1.0;
@@ -1811,7 +1811,7 @@ function drawMonsterFallback(
   // Ultimate fallback for unknown monsters
   ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.roundRect(cx - 10, cy - 6, 20, 18, 4);
+  ctx.rect(cx - 10, cy - 6, 20, 18);
   ctx.fill();
   ctx.strokeStyle = 'rgba(0,0,0,0.4)';
   ctx.lineWidth = 1;
@@ -2610,7 +2610,7 @@ export default function GameCanvas() {
           const cy = screenY + ts / 2;
           ctx.fillStyle = '#666';
           ctx.beginPath();
-          ctx.roundRect(cx - 10, cy - 6, 20, 18, 4);
+          ctx.rect(cx - 10, cy - 6, 20, 18);
           ctx.fill();
           // X eyes
           ctx.strokeStyle = '#999';
