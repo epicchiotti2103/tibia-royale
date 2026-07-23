@@ -2726,9 +2726,11 @@ export default function GameCanvas() {
           ctx.fillStyle = 'rgba(0,0,0,0.8)';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           ctx.fillStyle = 'red';
-          ctx.font = '16px monospace';
-          ctx.fillText("Crash: " + e.message, 20, 50);
-          ctx.fillText(e.stack || '', 20, 80);
+          ctx.font = '24px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText("Crash: " + e.message, canvas.width / 2, canvas.height / 2 - 20);
+          ctx.font = '14px monospace';
+          ctx.fillText(e.stack || '', canvas.width / 2, canvas.height / 2 + 20);
         }
       }
       console.error(e);
