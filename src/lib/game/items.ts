@@ -517,6 +517,7 @@ export const ITEMS: Record<string, ItemDefinition> = {
     sellPrice: 300,
     buyPrice: 600,
     color: '#ffd700',
+    icon: '🪙',
     icon: '👑',
   },
 
@@ -699,6 +700,7 @@ export const ITEMS: Record<string, ItemDefinition> = {
     sellPrice: 280,
     buyPrice: 550,
     color: '#ffd700',
+    icon: '🪙',
     icon: '🏹',
   },
 
@@ -1063,6 +1065,7 @@ export const ITEMS: Record<string, ItemDefinition> = {
     sellPrice: 2000,
     buyPrice: 4000,
     color: '#ffd700',
+    icon: '🪙',
     icon: '⚔️',
   },
   staff_of_destruction: {
@@ -1241,6 +1244,7 @@ export const ITEMS: Record<string, ItemDefinition> = {
     sellPrice: 2000,
     buyPrice: 4000,
     color: '#ffd700',
+    icon: '🪙',
     icon: '🛡️',
   },
   buckler_of_dawn: {
@@ -1378,6 +1382,7 @@ export const ITEMS: Record<string, ItemDefinition> = {
     sellPrice: 1,
     buyPrice: 0,
     color: '#ffd700',
+    icon: '🪙',
     icon: '🪙',
   },
 

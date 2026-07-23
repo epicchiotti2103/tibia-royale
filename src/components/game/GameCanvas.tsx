@@ -2546,8 +2546,8 @@ export default function GameCanvas() {
         const radius = (TILE_SIZE / 2) + Math.sin(glowPhase * Math.PI * 2) * 4;
         
         const itemDef = ITEMS[loot.itemId];
-        const icon = itemDef ? itemDef.icon : '📦';
-        const color = itemDef ? itemDef.color : '#f1c40f';
+        const icon = itemDef?.icon || '📦';
+        const color = itemDef?.color || '#f1c40f';
         
         ctx.save();
         ctx.beginPath();
