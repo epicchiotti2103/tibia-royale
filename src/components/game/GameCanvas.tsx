@@ -2439,6 +2439,7 @@ export default function GameCanvas() {
 
   // Render function - uses refs to avoid closure issues
   const doRender = useCallback(() => {
+    try {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -2717,7 +2718,21 @@ export default function GameCanvas() {
       ctx.fillStyle = '#2ecc71';
       ctx.fillText('🛡️ SAFE', canvasWidth / 2, 35);
     }
-
+    } catch (e: any) {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = 'rgba(0,0,0,0.8)';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = 'red';
+          ctx.font = '16px monospace';
+          ctx.fillText("Crash: " + e.message, 20, 50);
+          ctx.fillText(e.stack || '', 20, 80);
+        }
+      }
+      console.error(e);
+    }
   }, []);
 
   // Game loop ref to avoid self-reference
