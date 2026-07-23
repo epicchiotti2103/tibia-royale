@@ -255,6 +255,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       } else if (matchPhase === 'arena') {
         get().addChatMessage({ type: 'system', sender: 'System', content: '🏁 MATCH ENDED (TIME LIMIT)! 🏁', color: '#f1c40f' });
         set({ matchPhase: 'ended', matchTimeLeft: 0 });
+      }
     } else {
       set({ matchTimeLeft: newTime });
       
