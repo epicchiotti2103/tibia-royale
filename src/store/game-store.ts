@@ -469,7 +469,13 @@ export const useGameStore = create<GameState>((set, get) => ({
       
       // AI: Healing Logic
       const hpPercent = bot.stats.health / bot.stats.maxHealth;
-      const isFleeing = hpPercent < bot.fleeThreshold;
+      let isFleeing = hpPercent < bot.fleeThreshold;
+      
+      // Don't flee if player is extremely weak and we are aggressive!
+      if (isFleeing && player && player.stats.health < 40 && bot.strategy === 'aggressive') {
+          isFleeing = false;
+      }
+      
       if (isFleeing && (!bot.lastHealTime || now - bot.lastHealTime > 5000)) {
           newBot.stats.health = Math.min(bot.stats.maxHealth, bot.stats.health + 40);
           newBot.lastHealTime = now;
@@ -618,7 +624,12 @@ export const useGameStore = create<GameState>((set, get) => ({
                      
                      addDamageNumber(player!.position, finalDmg, 'damage');
                      get().addSpellEffect({ type: effect as any, position: { ...player!.position }, direction: Direction.SOUTH, color: spellColor, startTime: now, duration: 300 });
-                     set(s => ({ player: s.player ? { ...s.player, stats: { ...s.player.stats, health: Math.max(0, s.player.stats.health - finalDmg) } } : null }));
+                     set(s => {
+                       if (!s.player) return s;
+                       const newHealth = Math.max(0, s.player.stats.health - finalDmg);
+                       if (newHealth <= 0) setTimeout(() => s.playerDeath(), 0);
+                       return { player: { ...s.player, stats: { ...s.player.stats, health: newHealth } } };
+                     });
                   } else if (closestTarget.type === 'bot') {
                      let finalDmg = spellCast ? spellDamage : Math.floor(bot.stats.attack * 2.5);
                      if (spellCast) finalDmg = Math.max(1, Math.floor(finalDmg * 0.35)); // PvP scaling for spells
@@ -1036,7 +1047,11 @@ export const useGameStore = create<GameState>((set, get) => ({
          return;
       }
       
-      const result = playerAttackMonster(player.stats, player.equipment, {
+      const hasBuff = Date.now() < get().buffEndTime;
+      const effectiveStats = { ...player.stats };
+      if (hasBuff) effectiveStats.attack = Math.floor(effectiveStats.attack * 1.5);
+
+      const result = playerAttackMonster(effectiveStats, player.equipment, {
         attack: targetBot.stats.attack,
         defense: targetBot.stats.defense,
       } as any);
@@ -1117,7 +1132,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     // Mark combat time
     get().setLastCombatTime(Date.now());
 
-    const result = playerAttackMonster(player.stats, player.equipment, {
+    const hasBuff = Date.now() < get().buffEndTime;
+    const effectiveStats = { ...player.stats };
+    if (hasBuff) effectiveStats.attack = Math.floor(effectiveStats.attack * 1.5);
+
+    const result = playerAttackMonster(effectiveStats, player.equipment, {
       ...targetMonster,
       attack: def.attack,
       defense: def.defense,

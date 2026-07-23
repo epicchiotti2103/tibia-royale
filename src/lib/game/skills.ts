@@ -28,17 +28,16 @@ export const SKILLS: SkillDef[] = [
   // KNIGHT SKILLS (6 total - melee, tanky, area)
   // =============================================
   {
-    id: 'berserk',
-    name: 'Berserk',
-    description: 'Unleash a powerful area attack hitting all adjacent enemies.',
-    icon: '💥',
-    manaCost: 30,
-    cooldown: 6000,
-    type: 'attack',
-    range: 1,
+    id: 'blood_rage',
+    name: 'Blood Rage',
+    description: 'Boosts your sword attack power for 10 seconds.',
+    icon: '🩸',
+    manaCost: 20,
+    cooldown: 15000,
+    type: 'buff',
+    range: 0,
     vocation: [Vocation.KNIGHT],
     levelReq: 5,
-    damage: 10,
     color: '#e74c3c',
   },
   {
