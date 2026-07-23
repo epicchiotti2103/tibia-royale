@@ -7,6 +7,8 @@ export default function DeathScreen() {
   const player = useGameStore((s) => s.player);
   const respawn = useGameStore((s) => s.respawn);
   const setScreen = useGameStore((s) => s.setScreen);
+  const matchPhase = useGameStore((s) => s.matchPhase);
+  const matchTimeLeft = useGameStore((s) => s.matchTimeLeft);
 
   if (!player) return null;
 
@@ -51,12 +53,22 @@ export default function DeathScreen() {
 
         {/* Buttons */}
         <div className="space-y-3">
-          <button
-            onClick={respawn}
-            className="block w-64 mx-auto bg-amber-700 hover:bg-amber-600 text-white font-bold py-3 px-8 rounded-lg transition-all hover:scale-105 active:scale-95 shadow-lg shadow-amber-900/50"
-          >
-            ✨ Respawn in Town
-          </button>
+          {matchPhase === 'arena' ? (
+            <div className="bg-red-900/40 border border-red-500/30 rounded-lg p-4 max-w-xs mx-auto">
+              <p className="text-red-400 font-bold mb-2">⚔️ ELIMINATED ⚔️</p>
+              <p className="text-gray-300 text-sm">
+                The Battle Royale is ongoing.<br/>
+                Next match in {Math.ceil(matchTimeLeft / 1000)}s...
+              </p>
+            </div>
+          ) : (
+            <button
+              onClick={respawn}
+              className="block w-64 mx-auto bg-amber-700 hover:bg-amber-600 text-white font-bold py-3 px-8 rounded-lg transition-all hover:scale-105 active:scale-95 shadow-lg shadow-amber-900/50"
+            >
+              ✨ Respawn in Town
+            </button>
+          )}
           <button
             onClick={() => setScreen('login')}
             className="block w-64 mx-auto bg-gray-800 hover:bg-gray-700 text-gray-400 py-2 px-8 rounded-lg transition-all text-sm"

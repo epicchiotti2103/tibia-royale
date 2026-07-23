@@ -512,15 +512,12 @@ export const useGameStore = create<GameState>((set, get) => ({
 
           if (matchPhase === 'arena') {
              if (player && player.stats.health > 0) {
-                 if (!isInTown(player.position.x, player.position.y) && !isInTown(bot.position.x, bot.position.y)) {
-                     const dist = Math.abs(player.position.x - bot.position.x) + Math.abs(player.position.y - bot.position.y);
-                     closestTarget = { id: 'player', x: player.position.x, y: player.position.y, type: 'player' };
-                     minDistance = dist;
-                 }
+                 const dist = Math.abs(player.position.x - bot.position.x) + Math.abs(player.position.y - bot.position.y);
+                 closestTarget = { id: 'player', x: player.position.x, y: player.position.y, type: 'player' };
+                 minDistance = dist;
              }
              for (const otherBot of bots) {
                  if (otherBot.id === bot.id) continue;
-                 if (isInTown(otherBot.position.x, otherBot.position.y) || isInTown(bot.position.x, bot.position.y)) continue;
                  const dist = Math.abs(otherBot.position.x - bot.position.x) + Math.abs(otherBot.position.y - bot.position.y);
                  if (dist < minDistance) {
                      minDistance = dist;
@@ -1042,7 +1039,7 @@ export const useGameStore = create<GameState>((set, get) => ({
          addChatMessage({ type: 'system', sender: 'System', content: 'PvP is disabled during the hunting phase.', color: '#e74c3c' });
          return;
       }
-      if (isInTown(targetBot.position.x, targetBot.position.y) || isInTown(player.position.x, player.position.y)) {
+      if (get().matchPhase !== 'arena' && (isInTown(targetBot.position.x, targetBot.position.y) || isInTown(player.position.x, player.position.y))) {
          addChatMessage({ type: 'system', sender: 'System', content: 'You cannot attack players in the safe zone.', color: '#e74c3c' });
          return;
       }
