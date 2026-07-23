@@ -255,9 +255,49 @@ export const useGameStore = create<GameState>((set, get) => ({
       } else if (matchPhase === 'arena') {
         get().addChatMessage({ type: 'system', sender: 'System', content: '🏁 MATCH ENDED (TIME LIMIT)! 🏁', color: '#f1c40f' });
         set({ matchPhase: 'ended', matchTimeLeft: 0 });
-      }
     } else {
       set({ matchTimeLeft: newTime });
+      
+      // Natural HP/Mana Regen (roughly every ~1.5 seconds)
+      if (Math.random() < 0.01) {
+          const { player, bots } = get();
+          
+          if (player && player.stats.health > 0) {
+              const p = player;
+              const hpRegen = Math.max(1, Math.floor(p.stats.maxHealth * 0.01)); // 1% HP regen
+              const mpRegen = Math.max(2, Math.floor(p.stats.maxMana * 0.03)); // 3% Mana regen
+              
+              if (p.stats.health < p.stats.maxHealth || p.stats.mana < p.stats.maxMana) {
+                  set(state => ({
+                      player: state.player ? {
+                          ...state.player,
+                          stats: { 
+                              ...state.player.stats, 
+                              health: Math.min(state.player.stats.maxHealth, state.player.stats.health + hpRegen),
+                              mana: Math.min(state.player.stats.maxMana, state.player.stats.mana + mpRegen)
+                          }
+                      } : null
+                  }));
+              }
+          }
+          
+          const newBots = get().bots.map(b => {
+              if (b.stats.health > 0 && (b.stats.health < b.stats.maxHealth || b.stats.mana < b.stats.maxMana)) {
+                  const hpRegen = Math.max(1, Math.floor(b.stats.maxHealth * 0.01));
+                  const mpRegen = Math.max(2, Math.floor(b.stats.maxMana * 0.03));
+                  return {
+                      ...b,
+                      stats: {
+                          ...b.stats,
+                          health: Math.min(b.stats.maxHealth, b.stats.health + hpRegen),
+                          mana: Math.min(b.stats.maxMana, b.stats.mana + mpRegen)
+                      }
+                  };
+              }
+              return b;
+          });
+          set({ bots: newBots });
+      }
       
       // Check win condition and process safe zone during Arena
       if (get().matchPhase === 'arena') {
@@ -441,9 +481,22 @@ export const useGameStore = create<GameState>((set, get) => ({
           if (canMove) {
               const dx = Math.sign(50 - bot.position.x);
               const dy = Math.sign(50 - bot.position.y);
-              newBot.position = { x: bot.position.x + dx, y: bot.position.y + dy };
-              newBot.lastMoveTime = now;
-              botUpdated = true;
+              
+              if (dx !== 0 || dy !== 0) {
+                  const targetX = bot.position.x + dx;
+                  const targetY = bot.position.y + dy;
+                  
+                  if (!isPositionBlocked(targetX, targetY, gameMap)) {
+                      newBot.position = { x: targetX, y: targetY };
+                  } else if (dx !== 0 && !isPositionBlocked(targetX, bot.position.y, gameMap)) {
+                      newBot.position = { x: targetX, y: bot.position.y };
+                  } else if (dy !== 0 && !isPositionBlocked(bot.position.x, targetY, gameMap)) {
+                      newBot.position = { x: bot.position.x, y: targetY };
+                  }
+                  
+                  newBot.lastMoveTime = now;
+                  botUpdated = true;
+              }
           }
       } else {
           // Find Targets
@@ -517,6 +570,14 @@ export const useGameStore = create<GameState>((set, get) => ({
                      const ny = bot.position.y + dy;
                      if (!isPositionBlocked(nx, ny, gameMap)) {
                          newBot.position = { x: nx, y: ny };
+                         newBot.lastMoveTime = now;
+                         botUpdated = true;
+                     } else if (dx !== 0 && !isPositionBlocked(bot.position.x + dx, bot.position.y, gameMap)) {
+                         newBot.position = { x: bot.position.x + dx, y: bot.position.y };
+                         newBot.lastMoveTime = now;
+                         botUpdated = true;
+                     } else if (dy !== 0 && !isPositionBlocked(bot.position.x, bot.position.y + dy, gameMap)) {
+                         newBot.position = { x: bot.position.x, y: bot.position.y + dy };
                          newBot.lastMoveTime = now;
                          botUpdated = true;
                      }
