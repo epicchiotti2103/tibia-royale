@@ -528,13 +528,15 @@ export const useGameStore = create<GameState>((set, get) => ({
                   botUpdated = true;
                   
                   if (closestTarget.type === 'player') {
-                     addDamageNumber(player!.position, bot.stats.attack, 'damage');
+                     const botDmg = Math.floor(bot.stats.attack * 2.5);
+                     addDamageNumber(player!.position, botDmg, 'damage');
                      get().addSpellEffect({ type: bot.attackRange > 1 ? 'projectile' : 'sword_slash', position: { ...player!.position }, direction: Direction.SOUTH, color: '#e74c3c', startTime: now, duration: 300 });
-                     set(s => ({ player: s.player ? { ...s.player, stats: { ...s.player.stats, health: s.player.stats.health - bot.stats.attack } } : null }));
+                     set(s => ({ player: s.player ? { ...s.player, stats: { ...s.player.stats, health: Math.max(0, s.player.stats.health - botDmg) } } : null }));
                   } else if (closestTarget.type === 'bot') {
-                     addDamageNumber({ x: closestTarget.x, y: closestTarget.y }, bot.stats.attack, 'damage');
+                     const botDmg = Math.floor(bot.stats.attack * 2.5);
+                     addDamageNumber({ x: closestTarget.x, y: closestTarget.y }, botDmg, 'damage');
                      get().addSpellEffect({ type: bot.attackRange > 1 ? 'projectile' : 'sword_slash', position: { x: closestTarget.x, y: closestTarget.y }, direction: Direction.SOUTH, color: '#e74c3c', startTime: now, duration: 300 });
-                     botDamageMap.set(closestTarget.id, (botDamageMap.get(closestTarget.id) || 0) + bot.stats.attack);
+                     botDamageMap.set(closestTarget.id, (botDamageMap.get(closestTarget.id) || 0) + botDmg);
                   } else if (closestTarget.type === 'monster') {
                      addDamageNumber({ x: closestTarget.x, y: closestTarget.y }, bot.stats.attack, 'damage');
                      get().addSpellEffect({ type: bot.attackRange > 1 ? 'projectile' : 'sword_slash', position: { x: closestTarget.x, y: closestTarget.y }, direction: Direction.SOUTH, color: '#e74c3c', startTime: now, duration: 300 });
@@ -941,6 +943,9 @@ export const useGameStore = create<GameState>((set, get) => ({
         attack: targetBot.stats.attack,
         defense: targetBot.stats.defense,
       } as any);
+      
+      // PvP Damage Scaling: reduce basic attack damage by 65% in PvP to avoid one-shots
+      result.damage = Math.max(1, Math.floor(result.damage * 0.35));
 
       get().addSpellEffect({
         type: 'sword_slash',
@@ -1381,7 +1386,11 @@ export const useGameStore = create<GameState>((set, get) => ({
            addChatMessage({ type: 'system', sender: 'System', content: 'You cannot attack players in the safe zone.', color: '#e74c3c' });
            return;
         }
+        
+        // PvP Damage Scaling: spells deal massive damage, so we reduce it by 65% in PvP to avoid one-shots
+        dmg = Math.max(1, Math.floor(dmg * 0.35));
         dmg = Math.max(1, dmg - Math.floor(targetBot.stats.magicDefense * 0.3));
+        
         addDamageNumber(targetBot.position, -dmg, 'damage');
         addSpellEffect({ type: effectType, position: player.position, direction: player.direction, targetPosition: { ...targetBot.position }, color: skill.color, startTime: now, duration: 600, size: skill.range, damage: dmg });
         

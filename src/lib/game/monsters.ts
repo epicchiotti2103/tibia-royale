@@ -11,7 +11,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Rat',
     health: 15,
     maxHealth: 15,
-    attack: 3,
+    attack: 6,
     defense: 1,
     speed: 2,
     experience: 10,
@@ -35,7 +35,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Cave Bat',
     health: 20,
     maxHealth: 20,
-    attack: 5,
+    attack: 10,
     defense: 2,
     speed: 4,
     experience: 15,
@@ -55,7 +55,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Snake',
     health: 25,
     maxHealth: 25,
-    attack: 8,
+    attack: 16,
     defense: 2,
     speed: 3,
     experience: 20,
@@ -82,7 +82,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Giant Spider',
     health: 40,
     maxHealth: 40,
-    attack: 12,
+    attack: 24,
     defense: 5,
     speed: 3.5,
     experience: 35,
@@ -107,7 +107,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Goblin',
     health: 55,
     maxHealth: 55,
-    attack: 14,
+    attack: 28,
     defense: 6,
     speed: 4,
     experience: 45,
@@ -130,7 +130,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Wolf',
     health: 60,
     maxHealth: 60,
-    attack: 18,
+    attack: 36,
     defense: 8,
     speed: 4.5,
     experience: 50,
@@ -158,7 +158,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Giant Scorpion',
     health: 80,
     maxHealth: 80,
-    attack: 22,
+    attack: 44,
     defense: 12,
     speed: 3,
     experience: 60,
@@ -182,7 +182,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Orc',
     health: 120,
     maxHealth: 120,
-    attack: 25,
+    attack: 50,
     defense: 15,
     speed: 3,
     experience: 80,
@@ -209,7 +209,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Troll',
     health: 180,
     maxHealth: 180,
-    attack: 30,
+    attack: 60,
     defense: 18,
     speed: 2.5,
     experience: 100,
@@ -233,7 +233,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Skeleton',
     health: 80,
     maxHealth: 80,
-    attack: 20,
+    attack: 40,
     defense: 10,
     speed: 2.5,
     experience: 60,
@@ -259,7 +259,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Wraith',
     health: 150,
     maxHealth: 150,
-    attack: 35,
+    attack: 70,
     defense: 10,
     speed: 3.5,
     experience: 120,
@@ -284,7 +284,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Dark Mage',
     health: 200,
     maxHealth: 200,
-    attack: 45,
+    attack: 90,
     defense: 20,
     speed: 3,
     experience: 180,
@@ -308,7 +308,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Fire Elemental',
     health: 250,
     maxHealth: 250,
-    attack: 50,
+    attack: 100,
     defense: 25,
     speed: 3.5,
     experience: 200,
@@ -333,7 +333,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Demon',
     health: 500,
     maxHealth: 500,
-    attack: 60,
+    attack: 120,
     defense: 35,
     speed: 3.5,
     experience: 300,
@@ -365,7 +365,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Dragon',
     health: 800,
     maxHealth: 800,
-    attack: 80,
+    attack: 160,
     defense: 50,
     speed: 3,
     experience: 500,
@@ -394,7 +394,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Demon Lord',
     health: 1500,
     maxHealth: 1500,
-    attack: 100,
+    attack: 200,
     defense: 60,
     speed: 3.5,
     experience: 1000,
@@ -422,7 +422,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Ancient Dragon',
     health: 2500,
     maxHealth: 2500,
-    attack: 120,
+    attack: 240,
     defense: 70,
     speed: 2.5,
     experience: 2000,
@@ -452,7 +452,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Rabbit',
     health: 8,
     maxHealth: 8,
-    attack: 1,
+    attack: 2,
     defense: 0,
     speed: 5,
     experience: 5,
@@ -471,7 +471,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Giant Bee',
     health: 12,
     maxHealth: 12,
-    attack: 4,
+    attack: 8,
     defense: 1,
     speed: 6,
     experience: 8,
@@ -493,7 +493,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Bandit',
     health: 70,
     maxHealth: 70,
-    attack: 16,
+    attack: 32,
     defense: 7,
     speed: 3.5,
     experience: 55,
@@ -514,7 +514,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Wild Boar',
     health: 90,
     maxHealth: 90,
-    attack: 20,
+    attack: 40,
     defense: 10,
     speed: 4,
     experience: 55,
@@ -534,7 +534,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Pirate',
     health: 100,
     maxHealth: 100,
-    attack: 22,
+    attack: 44,
     defense: 12,
     speed: 3,
     experience: 70,
@@ -555,7 +555,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Poison Mushroom',
     health: 35,
     maxHealth: 35,
-    attack: 15,
+    attack: 30,
     defense: 3,
     speed: 1.5,
     experience: 30,
@@ -578,7 +578,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Stone Golem',
     health: 300,
     maxHealth: 300,
-    attack: 40,
+    attack: 80,
     defense: 35,
     speed: 1.5,
     experience: 150,
@@ -600,7 +600,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Vampire',
     health: 200,
     maxHealth: 200,
-    attack: 45,
+    attack: 90,
     defense: 15,
     speed: 5,
     experience: 160,
@@ -621,7 +621,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Necromancer',
     health: 180,
     maxHealth: 180,
-    attack: 55,
+    attack: 110,
     defense: 18,
     speed: 2.5,
     experience: 200,
@@ -643,7 +643,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Hydra',
     health: 400,
     maxHealth: 400,
-    attack: 55,
+    attack: 110,
     defense: 30,
     speed: 3,
     experience: 250,
@@ -665,7 +665,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Phoenix',
     health: 350,
     maxHealth: 350,
-    attack: 65,
+    attack: 130,
     defense: 20,
     speed: 4.5,
     experience: 280,
@@ -689,7 +689,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Lich King',
     health: 2000,
     maxHealth: 2000,
-    attack: 100,
+    attack: 200,
     defense: 50,
     speed: 3,
     experience: 1500,
@@ -714,7 +714,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     name: 'Kraken',
     health: 3000,
     maxHealth: 3000,
-    attack: 130,
+    attack: 260,
     defense: 60,
     speed: 2,
     experience: 2500,
@@ -737,7 +737,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
 
   // === NEW ANIMALS ===
   deer: {
-    id: 'deer', name: 'Deer', health: 35, maxHealth: 35, attack: 5, defense: 3, speed: 6, experience: 25,
+    id: 'deer', name: 'Deer', health: 35, maxHealth: 35, attack: 10, defense: 3, speed: 6, experience: 25,
     lootTable: [
       { itemId: 'gold_coin', chance: 0.6, minQuantity: 2, maxQuantity: 8 },
       { itemId: 'raw_meat', chance: 0.4, minQuantity: 1, maxQuantity: 2 },
@@ -745,7 +745,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     color: '#A0522D', icon: '🦌', aggressive: false, chaseRange: 6, attackRange: 1, attackSpeed: 1800,
   },
   bear: {
-    id: 'bear', name: 'Brown Bear', health: 200, maxHealth: 200, attack: 35, defense: 20, speed: 3, experience: 120,
+    id: 'bear', name: 'Brown Bear', health: 200, maxHealth: 200, attack: 70, defense: 20, speed: 3, experience: 120,
     lootTable: [
       { itemId: 'gold_coin', chance: 1, minQuantity: 20, maxQuantity: 60 },
       { itemId: 'health_potion_medium', chance: 0.25, minQuantity: 1, maxQuantity: 2 },
@@ -759,7 +759,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     },
   },
   crocodile: {
-    id: 'crocodile', name: 'Crocodile', health: 150, maxHealth: 150, attack: 30, defense: 18, speed: 2.5, experience: 90,
+    id: 'crocodile', name: 'Crocodile', health: 150, maxHealth: 150, attack: 60, defense: 18, speed: 2.5, experience: 90,
     lootTable: [
       { itemId: 'gold_coin', chance: 1, minQuantity: 15, maxQuantity: 50 },
       { itemId: 'health_potion_medium', chance: 0.2, minQuantity: 1, maxQuantity: 2 },
@@ -768,14 +768,14 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     color: '#2E5A1E', icon: '🐊', aggressive: true, chaseRange: 5, attackRange: 1, attackSpeed: 2000,
   },
   frog: {
-    id: 'frog', name: 'Giant Frog', health: 20, maxHealth: 20, attack: 6, defense: 2, speed: 4, experience: 12,
+    id: 'frog', name: 'Giant Frog', health: 20, maxHealth: 20, attack: 12, defense: 2, speed: 4, experience: 12,
     lootTable: [
       { itemId: 'gold_coin', chance: 0.5, minQuantity: 1, maxQuantity: 5 },
     ],
     color: '#228B22', icon: '🐸', aggressive: false, chaseRange: 3, attackRange: 1, attackSpeed: 1200,
   },
   hawk: {
-    id: 'hawk', name: 'Hawk', health: 45, maxHealth: 45, attack: 15, defense: 5, speed: 5.5, experience: 35,
+    id: 'hawk', name: 'Hawk', health: 45, maxHealth: 45, attack: 30, defense: 5, speed: 5.5, experience: 35,
     lootTable: [
       { itemId: 'gold_coin', chance: 0.8, minQuantity: 5, maxQuantity: 15 },
       { itemId: 'feather', chance: 0.3, minQuantity: 1, maxQuantity: 3 },
@@ -783,7 +783,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     color: '#4A3520', icon: '🦅', aggressive: true, chaseRange: 10, attackRange: 1, attackSpeed: 1000,
   },
   crab: {
-    id: 'crab', name: 'Giant Crab', health: 40, maxHealth: 40, attack: 14, defense: 15, speed: 2, experience: 30,
+    id: 'crab', name: 'Giant Crab', health: 40, maxHealth: 40, attack: 28, defense: 15, speed: 2, experience: 30,
     lootTable: [
       { itemId: 'gold_coin', chance: 0.8, minQuantity: 3, maxQuantity: 12 },
       { itemId: 'crab_claw', chance: 0.2, minQuantity: 1, maxQuantity: 2 },
@@ -791,7 +791,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     color: '#B22222', icon: '🦀', aggressive: true, chaseRange: 3, attackRange: 1, attackSpeed: 1800,
   },
   minotaur: {
-    id: 'minotaur', name: 'Minotaur', health: 350, maxHealth: 350, attack: 50, defense: 30, speed: 3, experience: 220,
+    id: 'minotaur', name: 'Minotaur', health: 350, maxHealth: 350, attack: 100, defense: 30, speed: 3, experience: 220,
     lootTable: [
       { itemId: 'gold_coin', chance: 1, minQuantity: 40, maxQuantity: 120 },
       { itemId: 'health_potion_large', chance: 0.3, minQuantity: 1, maxQuantity: 3 },
@@ -802,7 +802,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     color: '#6B3A1A', icon: '🐂', aggressive: true, chaseRange: 10, attackRange: 1, attackSpeed: 1600,
   },
   cobra: {
-    id: 'cobra', name: 'King Cobra', health: 100, maxHealth: 100, attack: 28, defense: 8, speed: 4, experience: 75,
+    id: 'cobra', name: 'King Cobra', health: 100, maxHealth: 100, attack: 56, defense: 8, speed: 4, experience: 75,
     lootTable: [
       { itemId: 'gold_coin', chance: 1, minQuantity: 12, maxQuantity: 40 },
       { itemId: 'health_potion_medium', chance: 0.2, minQuantity: 1, maxQuantity: 1 },
@@ -813,7 +813,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
 
   // === NEW BEASTS & CREATURES ===
   wild_dog: {
-    id: 'wild_dog', name: 'Wild Dog', health: 35, maxHealth: 35, attack: 10, defense: 4, speed: 5, experience: 25,
+    id: 'wild_dog', name: 'Wild Dog', health: 35, maxHealth: 35, attack: 20, defense: 4, speed: 5, experience: 25,
     lootTable: [
       { itemId: 'gold_coin', chance: 0.7, minQuantity: 1, maxQuantity: 8 },
       { itemId: 'leather_helmet', chance: 0.05, minQuantity: 1, maxQuantity: 1 },
@@ -822,7 +822,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     color: '#8B6914', icon: '🐕', aggressive: true, chaseRange: 6, attackRange: 1, attackSpeed: 1500,
   },
   cat: {
-    id: 'cat', name: 'Stray Cat', health: 8, maxHealth: 8, attack: 2, defense: 1, speed: 6, experience: 5,
+    id: 'cat', name: 'Stray Cat', health: 8, maxHealth: 8, attack: 4, defense: 1, speed: 6, experience: 5,
     lootTable: [
       { itemId: 'gold_coin', chance: 0.2, minQuantity: 1, maxQuantity: 2 },
       { itemId: 'feather', chance: 0.05, minQuantity: 1, maxQuantity: 1 },
@@ -830,7 +830,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     color: '#FF8C00', icon: '🐱', aggressive: false, chaseRange: 2, attackRange: 1, attackSpeed: 2000,
   },
   toad: {
-    id: 'toad', name: 'Giant Toad', health: 30, maxHealth: 30, attack: 6, defense: 3, speed: 2, experience: 15,
+    id: 'toad', name: 'Giant Toad', health: 30, maxHealth: 30, attack: 12, defense: 3, speed: 2, experience: 15,
     lootTable: [
       { itemId: 'gold_coin', chance: 0.6, minQuantity: 1, maxQuantity: 6 },
       { itemId: 'mana_potion_small', chance: 0.15, minQuantity: 1, maxQuantity: 1 },
@@ -838,7 +838,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     color: '#2E8B57', icon: '🐸', aggressive: false, chaseRange: 2, attackRange: 1, attackSpeed: 2000,
   },
   mantis: {
-    id: 'mantis', name: 'Giant Mantis', health: 45, maxHealth: 45, attack: 16, defense: 6, speed: 5, experience: 40,
+    id: 'mantis', name: 'Giant Mantis', health: 45, maxHealth: 45, attack: 32, defense: 6, speed: 5, experience: 40,
     lootTable: [
       { itemId: 'gold_coin', chance: 0.8, minQuantity: 3, maxQuantity: 15 },
       { itemId: 'health_potion_small', chance: 0.2, minQuantity: 1, maxQuantity: 1 },
@@ -847,7 +847,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     color: '#228B22', icon: '🦗', aggressive: true, chaseRange: 5, attackRange: 1, attackSpeed: 1200,
   },
   war_wolf: {
-    id: 'war_wolf', name: 'War Wolf', health: 100, maxHealth: 100, attack: 28, defense: 12, speed: 5, experience: 75,
+    id: 'war_wolf', name: 'War Wolf', health: 100, maxHealth: 100, attack: 56, defense: 12, speed: 5, experience: 75,
     lootTable: [
       { itemId: 'gold_coin', chance: 1, minQuantity: 10, maxQuantity: 35 },
       { itemId: 'health_potion_medium', chance: 0.2, minQuantity: 1, maxQuantity: 2 },
@@ -858,7 +858,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     color: '#2F2F2F', icon: '🐺', aggressive: true, chaseRange: 8, attackRange: 1, attackSpeed: 1400,
   },
   wild_boar: {
-    id: 'wild_boar', name: 'Wild Boar', health: 70, maxHealth: 70, attack: 20, defense: 10, speed: 4, experience: 55,
+    id: 'wild_boar', name: 'Wild Boar', health: 70, maxHealth: 70, attack: 40, defense: 10, speed: 4, experience: 55,
     lootTable: [
       { itemId: 'gold_coin', chance: 0.9, minQuantity: 5, maxQuantity: 20 },
       { itemId: 'raw_meat', chance: 0.4, minQuantity: 1, maxQuantity: 3 },
@@ -867,7 +867,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     color: '#5C4033', icon: '🐗', aggressive: true, chaseRange: 5, attackRange: 1, attackSpeed: 1600,
   },
   stone_golem: {
-    id: 'stone_golem', name: 'Stone Golem', health: 300, maxHealth: 300, attack: 35, defense: 30, speed: 1.5, experience: 150,
+    id: 'stone_golem', name: 'Stone Golem', health: 300, maxHealth: 300, attack: 70, defense: 30, speed: 1.5, experience: 150,
     lootTable: [
       { itemId: 'gold_coin', chance: 1, minQuantity: 30, maxQuantity: 80 },
       { itemId: 'iron_shield', chance: 0.08, minQuantity: 1, maxQuantity: 1 },
@@ -877,7 +877,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     color: '#696969', icon: '🗿', aggressive: false, chaseRange: 3, attackRange: 1, attackSpeed: 3000,
   },
   ghost: {
-    id: 'ghost', name: 'Ghost', health: 50, maxHealth: 50, attack: 25, defense: 5, speed: 3, experience: 60,
+    id: 'ghost', name: 'Ghost', health: 50, maxHealth: 50, attack: 50, defense: 5, speed: 3, experience: 60,
     lootTable: [
       { itemId: 'gold_coin', chance: 0.8, minQuantity: 5, maxQuantity: 20 },
       { itemId: 'mana_potion_medium', chance: 0.2, minQuantity: 1, maxQuantity: 1 },
@@ -887,7 +887,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     color: '#B0C4DE', icon: '👻', aggressive: true, chaseRange: 7, attackRange: 1, attackSpeed: 1800,
   },
   thornback: {
-    id: 'thornback', name: 'Thornback Tortoise', health: 120, maxHealth: 120, attack: 10, defense: 35, speed: 1.5, experience: 65,
+    id: 'thornback', name: 'Thornback Tortoise', health: 120, maxHealth: 120, attack: 20, defense: 35, speed: 1.5, experience: 65,
     lootTable: [
       { itemId: 'gold_coin', chance: 1, minQuantity: 8, maxQuantity: 25 },
       { itemId: 'crocodile_skin', chance: 0.15, minQuantity: 1, maxQuantity: 2 },
@@ -897,7 +897,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     color: '#556B2F', icon: '🐢', aggressive: false, chaseRange: 2, attackRange: 1, attackSpeed: 2500,
   },
   eagle: {
-    id: 'eagle', name: 'Mountain Eagle', health: 55, maxHealth: 55, attack: 22, defense: 6, speed: 6, experience: 50,
+    id: 'eagle', name: 'Mountain Eagle', health: 55, maxHealth: 55, attack: 44, defense: 6, speed: 6, experience: 50,
     lootTable: [
       { itemId: 'gold_coin', chance: 0.9, minQuantity: 5, maxQuantity: 18 },
       { itemId: 'feather', chance: 0.5, minQuantity: 1, maxQuantity: 4 },
