@@ -1627,27 +1627,17 @@ export const useGameStore = create<GameState>((set, get) => ({
       const itemDef = ITEMS[itemId];
       const inventory = [...state.player.inventory];
 
-      if (itemDef?.stackable) {
-        const existing = inventory.find(i => i.itemId === itemId);
-        if (existing) {
-          existing.quantity += quantity;
-        } else {
-          inventory.push({
-            id: generateLootId(),
-            itemId,
-            quantity,
-            slot: inventory.length,
-          });
-        }
+      // Always stack identical items in the inventory
+      const existing = inventory.find(i => i.itemId === itemId);
+      if (existing) {
+        existing.quantity += quantity;
       } else {
-        for (let i = 0; i < quantity; i++) {
-          inventory.push({
-            id: generateLootId(),
-            itemId,
-            quantity: 1,
-            slot: inventory.length,
-          });
-        }
+        inventory.push({
+          id: generateLootId(),
+          itemId,
+          quantity,
+          slot: inventory.length,
+        });
       }
 
       return { player: { ...state.player, inventory } };
@@ -1755,9 +1745,20 @@ export const useGameStore = create<GameState>((set, get) => ({
     const newEquipment = { ...player.equipment };
     newEquipment[slot] = invItem.itemId;
 
-    const newInventory = player.inventory.filter(i => i.id !== invItemId);
+    let newInventory = [...player.inventory];
+    if (invItem.quantity > 1) {
+      newInventory = newInventory.map(i => i.id === invItemId ? { ...i, quantity: i.quantity - 1 } : i);
+    } else {
+      newInventory = newInventory.filter(i => i.id !== invItemId);
+    }
+
     if (currentEquipped) {
-      newInventory.push({ id: generateLootId(), itemId: currentEquipped, quantity: 1, slot: newInventory.length });
+      const existing = newInventory.find(i => i.itemId === currentEquipped);
+      if (existing) {
+        existing.quantity += 1;
+      } else {
+        newInventory.push({ id: generateLootId(), itemId: currentEquipped, quantity: 1, slot: newInventory.length });
+      }
     }
 
     set(state => ({

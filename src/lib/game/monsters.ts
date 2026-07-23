@@ -135,6 +135,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     speed: 4.5,
     experience: 50,
     lootTable: [
+      { itemId: 'meat', chance: 0.6, minQuantity: 1, maxQuantity: 1 },
       { itemId: 'gold_coin', chance: 1, minQuantity: 8, maxQuantity: 30 },
       { itemId: 'health_potion_medium', chance: 0.15, minQuantity: 1, maxQuantity: 1 },
       { itemId: 'leather_helmet', chance: 0.08, minQuantity: 1, maxQuantity: 1 },
@@ -370,6 +371,8 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     speed: 3,
     experience: 500,
     lootTable: [
+      { itemId: 'golden_armor', chance: 0.05, minQuantity: 1, maxQuantity: 1 },
+      { itemId: 'boots_of_haste', chance: 0.05, minQuantity: 1, maxQuantity: 1 },
       { itemId: 'gold_coin', chance: 1, minQuantity: 100, maxQuantity: 500 },
       { itemId: 'health_potion_large', chance: 0.7, minQuantity: 2, maxQuantity: 5 },
       { itemId: 'mana_potion_large', chance: 0.5, minQuantity: 1, maxQuantity: 3 },
@@ -399,6 +402,8 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     speed: 3.5,
     experience: 1000,
     lootTable: [
+      { itemId: 'magic_plate_armor', chance: 0.05, minQuantity: 1, maxQuantity: 1 },
+      { itemId: 'golden_armor', chance: 0.1, minQuantity: 1, maxQuantity: 1 },
       { itemId: 'gold_coin', chance: 1, minQuantity: 200, maxQuantity: 800 },
       { itemId: 'health_potion_large', chance: 0.9, minQuantity: 3, maxQuantity: 8 },
       { itemId: 'mana_potion_large', chance: 0.8, minQuantity: 3, maxQuantity: 6 },
@@ -427,6 +432,9 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     speed: 2.5,
     experience: 2000,
     lootTable: [
+      { itemId: 'magic_plate_armor', chance: 0.1, minQuantity: 1, maxQuantity: 1 },
+      { itemId: 'boots_of_haste', chance: 0.15, minQuantity: 1, maxQuantity: 1 },
+      { itemId: 'crystal_wand', chance: 0.2, minQuantity: 1, maxQuantity: 1 },
       { itemId: 'gold_coin', chance: 1, minQuantity: 500, maxQuantity: 1500 },
       { itemId: 'health_potion_large', chance: 1, minQuantity: 5, maxQuantity: 10 },
       { itemId: 'mana_potion_large', chance: 0.9, minQuantity: 5, maxQuantity: 8 },
@@ -457,6 +465,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
     speed: 5,
     experience: 5,
     lootTable: [
+      { itemId: 'meat', chance: 0.5, minQuantity: 1, maxQuantity: 1 },
       { itemId: 'gold_coin', chance: 0.5, minQuantity: 1, maxQuantity: 3 },
     ],
     color: '#f5f5dc',
@@ -739,6 +748,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
   deer: {
     id: 'deer', name: 'Deer', health: 35, maxHealth: 35, attack: 10, defense: 3, speed: 6, experience: 25,
     lootTable: [
+      { itemId: 'meat', chance: 0.8, minQuantity: 1, maxQuantity: 2 },
       { itemId: 'gold_coin', chance: 0.6, minQuantity: 2, maxQuantity: 8 },
       { itemId: 'raw_meat', chance: 0.4, minQuantity: 1, maxQuantity: 2 },
     ],
@@ -747,6 +757,7 @@ export const MONSTERS: Record<string, MonsterDefinition> = {
   bear: {
     id: 'bear', name: 'Brown Bear', health: 200, maxHealth: 200, attack: 70, defense: 20, speed: 3, experience: 120,
     lootTable: [
+      { itemId: 'meat', chance: 1.0, minQuantity: 1, maxQuantity: 3 },
       { itemId: 'gold_coin', chance: 1, minQuantity: 20, maxQuantity: 60 },
       { itemId: 'health_potion_medium', chance: 0.25, minQuantity: 1, maxQuantity: 2 },
       { itemId: 'raw_meat', chance: 0.5, minQuantity: 2, maxQuantity: 4 },
