@@ -527,23 +527,50 @@ export const useGameStore = create<GameState>((set, get) => ({
                   newBot.lastAttackTime = now;
                   botUpdated = true;
                   
+                  // 30% chance to cast a skill if they have enough mana
+                  let spellCast = false;
+                  let spellDamage = 0;
+                  let effect = bot.attackRange > 1 ? 'projectile' : 'sword_slash';
+                  let spellColor = '#e74c3c';
+                  
+                  if (Math.random() < 0.3) {
+                      const skills = getSkillsForVocation(bot.vocation).filter(s => s.type === 'attack');
+                      if (skills.length > 0) {
+                          const skill = skills[Math.floor(Math.random() * skills.length)];
+                          if (bot.stats.mana >= skill.manaCost) {
+                              newBot.stats.mana -= skill.manaCost;
+                              spellCast = true;
+                              effect = getSkillEffectType(skill.id) as any;
+                              spellColor = skill.color;
+                              
+                              const magicPower = bot.stats.magicAttack + (skill.damage || 0) * 0.3;
+                              spellDamage = Math.floor((skill.damage || 30) + magicPower * 0.5);
+                          }
+                      }
+                  }
+                  
                   if (closestTarget.type === 'player') {
-                     const botDmg = Math.floor(bot.stats.attack * 2.5);
-                     addDamageNumber(player!.position, botDmg, 'damage');
-                     get().addSpellEffect({ type: bot.attackRange > 1 ? 'projectile' : 'sword_slash', position: { ...player!.position }, direction: Direction.SOUTH, color: '#e74c3c', startTime: now, duration: 300 });
-                     set(s => ({ player: s.player ? { ...s.player, stats: { ...s.player.stats, health: Math.max(0, s.player.stats.health - botDmg) } } : null }));
+                     let finalDmg = spellCast ? spellDamage : Math.floor(bot.stats.attack * 2.5);
+                     if (spellCast) finalDmg = Math.max(1, Math.floor(finalDmg * 0.35)); // PvP scaling for spells
+                     
+                     addDamageNumber(player!.position, finalDmg, 'damage');
+                     get().addSpellEffect({ type: effect as any, position: { ...player!.position }, direction: Direction.SOUTH, color: spellColor, startTime: now, duration: 300 });
+                     set(s => ({ player: s.player ? { ...s.player, stats: { ...s.player.stats, health: Math.max(0, s.player.stats.health - finalDmg) } } : null }));
                   } else if (closestTarget.type === 'bot') {
-                     const botDmg = Math.floor(bot.stats.attack * 2.5);
-                     addDamageNumber({ x: closestTarget.x, y: closestTarget.y }, botDmg, 'damage');
-                     get().addSpellEffect({ type: bot.attackRange > 1 ? 'projectile' : 'sword_slash', position: { x: closestTarget.x, y: closestTarget.y }, direction: Direction.SOUTH, color: '#e74c3c', startTime: now, duration: 300 });
-                     botDamageMap.set(closestTarget.id, (botDamageMap.get(closestTarget.id) || 0) + botDmg);
+                     let finalDmg = spellCast ? spellDamage : Math.floor(bot.stats.attack * 2.5);
+                     if (spellCast) finalDmg = Math.max(1, Math.floor(finalDmg * 0.35)); // PvP scaling for spells
+                     
+                     addDamageNumber({ x: closestTarget.x, y: closestTarget.y }, finalDmg, 'damage');
+                     get().addSpellEffect({ type: effect as any, position: { x: closestTarget.x, y: closestTarget.y }, direction: Direction.SOUTH, color: spellColor, startTime: now, duration: 300 });
+                     botDamageMap.set(closestTarget.id, (botDamageMap.get(closestTarget.id) || 0) + finalDmg);
                   } else if (closestTarget.type === 'monster') {
-                     addDamageNumber({ x: closestTarget.x, y: closestTarget.y }, bot.stats.attack, 'damage');
-                     get().addSpellEffect({ type: bot.attackRange > 1 ? 'projectile' : 'sword_slash', position: { x: closestTarget.x, y: closestTarget.y }, direction: Direction.SOUTH, color: '#e74c3c', startTime: now, duration: 300 });
+                     let finalDmg = spellCast ? spellDamage : bot.stats.attack;
+                     addDamageNumber({ x: closestTarget.x, y: closestTarget.y }, finalDmg, 'damage');
+                     get().addSpellEffect({ type: effect as any, position: { x: closestTarget.x, y: closestTarget.y }, direction: Direction.SOUTH, color: spellColor, startTime: now, duration: 300 });
                      
                      const ml = get().monsters.map(m => {
                          if (m.id === closestTarget!.id && !m.isDead) {
-                             const mH = m.health - bot.stats.attack;
+                             const mH = m.health - finalDmg;
                              if (mH <= 0) {
                                  newBot.stats.level += 1;
                                  newBot.stats.attack += 2;
