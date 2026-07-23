@@ -216,9 +216,9 @@ function AttackButton({
 }
 
 const SKILL_POSITIONS = [
-  { right: 168, bottom: 210, size: 50 },
-  { right: 128, bottom: 155, size: 54 },
-  { right: 88, bottom: 100, size: 58 },
+  { right: 175, bottom: 215, size: 58 },
+  { right: 135, bottom: 160, size: 62 },
+  { right: 95, bottom: 105, size: 66 },
 ] as const;
 
 function SkillButton({ slotIndex }: { slotIndex: 0 | 1 | 2 }) {
@@ -268,18 +268,18 @@ function SkillButton({ slotIndex }: { slotIndex: 0 | 1 | 2 }) {
         height: pos.size,
         borderRadius: '50%',
         background: locked
-          ? 'rgba(80, 80, 80, 0.4)'
-          : `radial-gradient(circle at 35% 30%, ${skill.color}cc, ${skill.color} 55%, ${skill.color}88)`,
-        border: '2px solid rgba(255, 255, 255, 0.7)',
-        boxShadow: locked ? 'none' : `0 0 14px ${skill.color}80`,
-        opacity: locked ? 0.4 : 1,
+          ? 'rgba(80, 80, 80, 0.6)'
+          : `radial-gradient(circle at 35% 30%, ${skill.color}, ${skill.color}ea, ${skill.color}cc)`,
+        border: locked ? '2px solid rgba(255, 255, 255, 0.4)' : '3px solid rgba(255, 255, 255, 1)',
+        boxShadow: locked ? 'none' : `0 0 20px ${skill.color}, inset 0 0 10px rgba(0,0,0,0.5)`,
+        opacity: locked ? 0.6 : 1,
         filter: locked ? 'grayscale(1)' : 'none',
         touchAction: 'none',
         cursor: locked ? 'not-allowed' : 'pointer',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize: pos.size * 0.42,
+        fontSize: pos.size * 0.48,
         padding: 0,
       }}
       onPointerDown={handlePointerDown}
