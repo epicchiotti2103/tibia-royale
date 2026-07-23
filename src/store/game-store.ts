@@ -452,12 +452,15 @@ export const useGameStore = create<GameState>((set, get) => ({
 
           if (matchPhase === 'arena') {
              if (player && player.stats.health > 0) {
-                 const dist = Math.abs(player.position.x - bot.position.x) + Math.abs(player.position.y - bot.position.y);
-                 closestTarget = { id: 'player', x: player.position.x, y: player.position.y, type: 'player' };
-                 minDistance = dist;
+                 if (!isInTown(player.position.x, player.position.y) && !isInTown(bot.position.x, bot.position.y)) {
+                     const dist = Math.abs(player.position.x - bot.position.x) + Math.abs(player.position.y - bot.position.y);
+                     closestTarget = { id: 'player', x: player.position.x, y: player.position.y, type: 'player' };
+                     minDistance = dist;
+                 }
              }
              for (const otherBot of bots) {
                  if (otherBot.id === bot.id) continue;
+                 if (isInTown(otherBot.position.x, otherBot.position.y) || isInTown(bot.position.x, bot.position.y)) continue;
                  const dist = Math.abs(otherBot.position.x - bot.position.x) + Math.abs(otherBot.position.y - bot.position.y);
                  if (dist < minDistance) {
                      minDistance = dist;
@@ -929,6 +932,11 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     // Attack BOT logic
     if (targetBot) {
+      if (isInTown(targetBot.position.x, targetBot.position.y) || isInTown(player.position.x, player.position.y)) {
+         addChatMessage({ type: 'system', sender: 'System', content: 'You cannot attack players in the safe zone.', color: '#e74c3c' });
+         return;
+      }
+      
       const result = playerAttackMonster(player.stats, player.equipment, {
         attack: targetBot.stats.attack,
         defense: targetBot.stats.defense,
@@ -1369,6 +1377,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     
     // Apply damage to BOT
     if (targetBot) {
+        if (isInTown(targetBot.position.x, targetBot.position.y) || isInTown(player.position.x, player.position.y)) {
+           addChatMessage({ type: 'system', sender: 'System', content: 'You cannot attack players in the safe zone.', color: '#e74c3c' });
+           return;
+        }
         dmg = Math.max(1, dmg - Math.floor(targetBot.stats.magicDefense * 0.3));
         addDamageNumber(targetBot.position, -dmg, 'damage');
         addSpellEffect({ type: effectType, position: player.position, direction: player.direction, targetPosition: { ...targetBot.position }, color: skill.color, startTime: now, duration: 600, size: skill.range, damage: dmg });
