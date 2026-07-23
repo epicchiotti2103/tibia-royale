@@ -326,8 +326,8 @@ export const VOCATION_STATS: Record<Vocation, VocationStats> = {
     healthPerLevel: 18,
     baseMana: 40,
     manaPerLevel: 10,
-    baseAttack: 6,
-    attackPerLevel: 3.5,
+    baseAttack: 30, // Buffed
+    attackPerLevel: 12, // Buffed
     baseDefense: 6,
     defensePerLevel: 5,
     baseMagicAttack: 1,
@@ -371,8 +371,8 @@ export const VOCATION_STATS: Record<Vocation, VocationStats> = {
     healthPerLevel: 18,
     baseMana: 60,
     manaPerLevel: 15,
-    baseAttack: 10,
-    attackPerLevel: 5,
+    baseAttack: 28, // Buffed
+    attackPerLevel: 14, // Buffed
     baseDefense: 7,
     defensePerLevel: 5.5,
     baseMagicAttack: 5,

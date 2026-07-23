@@ -974,10 +974,13 @@ export const useGameStore = create<GameState>((set, get) => ({
     const { player, monsters, bots, matchPhase, addDamageNumber, addChatMessage, botDamageMap, addSpellEffect } = get();
     if (!player) return;
     
+    // Allow attacking from safe zone to prevent monsters blocking the exit
+    /*
     if (matchPhase !== 'arena' && isInTown(player.position.x, player.position.y)) {
        addChatMessage({ type: 'system', sender: 'System', content: "🛡️ You cannot attack in the Protection Zone.", color: '#e67e22' });
        return;
     }
+    */
 
     const now = Date.now();
     // Find target in front of player
@@ -1024,6 +1027,10 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     // Attack BOT logic
     if (targetBot) {
+      if (get().matchPhase === 'hunting') {
+         addChatMessage({ type: 'system', sender: 'System', content: 'PvP is disabled during the hunting phase.', color: '#e74c3c' });
+         return;
+      }
       if (isInTown(targetBot.position.x, targetBot.position.y) || isInTown(player.position.x, player.position.y)) {
          addChatMessage({ type: 'system', sender: 'System', content: 'You cannot attack players in the safe zone.', color: '#e74c3c' });
          return;
@@ -1347,10 +1354,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     const skill = getSkill(skillId);
     if (!skill) return;
 
+    /*
     if (skill.type !== 'heal' && skill.type !== 'buff' && matchPhase !== 'arena' && isInTown(player.position.x, player.position.y)) {
        addChatMessage({ type: 'system', sender: 'System', content: "🛡️ You cannot cast offensive spells in the Protection Zone.", color: '#e67e22' });
        return;
     }
+    */
 
     const { skillUpgrades } = get();
     const upgradeLevel = skillUpgrades[skill.id] || 0;
@@ -1472,7 +1481,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     
     // Apply damage to BOT
     if (targetBot) {
-        if (isInTown(targetBot.position.x, targetBot.position.y) || isInTown(player.position.x, player.position.y)) {
+        if (get().matchPhase === 'hunting') {
+         addChatMessage({ type: 'system', sender: 'System', content: 'PvP is disabled during the hunting phase.', color: '#e74c3c' });
+         return;
+      }
+      if (isInTown(targetBot.position.x, targetBot.position.y) || isInTown(player.position.x, player.position.y)) {
            addChatMessage({ type: 'system', sender: 'System', content: 'You cannot attack players in the safe zone.', color: '#e74c3c' });
            return;
         }
@@ -1533,14 +1546,20 @@ export const useGameStore = create<GameState>((set, get) => ({
         addChatMessage({ type: 'combat', sender: 'Skill', content: `${skill.icon} ${skill.name} killed ${def.name}! +${def.experience} XP`, color: '#f1c40f' });
         addDamageNumber(targetMonster!.position, def.experience, 'xp');
 
-        // Loot
+        // Loot drops on ground
         const loot = generateLoot(def.lootTable);
-        for (const drop of loot) {
-          if (drop.itemId === 'gold_coin') {
-            set(state => ({ player: state.player ? { ...state.player, gold: state.player.gold + drop.quantity } : null }));
-          } else {
-            addToInventory(drop.itemId, drop.quantity);
+        if (loot.length > 0) {
+          const newDrops: DroppedLoot[] = [];
+          for (const drop of loot) {
+            newDrops.push({
+              id: `loot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              position: { ...targetMonster!.position },
+              itemId: drop.itemId,
+              quantity: drop.quantity,
+              expiresAt: Date.now() + 30000,
+            });
           }
+          set(state => ({ droppedLoot: [...state.droppedLoot, ...newDrops] }));
         }
 
         // XP
