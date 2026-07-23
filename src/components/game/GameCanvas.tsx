@@ -2520,21 +2520,39 @@ export default function GameCanvas() {
        const cx = 50 * TILE_SIZE + (TILE_SIZE / 2) - camX;
        const cy = 50 * TILE_SIZE + (TILE_SIZE / 2) - camY;
        
-       ctx.save();
-       ctx.strokeStyle = 'rgba(255, 60, 60, 0.7)';
-       ctx.lineWidth = 4;
-       ctx.beginPath();
-       ctx.arc(cx, cy, safeZoneRadius * TILE_SIZE, 0, Math.PI * 2);
-       ctx.stroke();
+       // Draw Shadow Wraiths around the circle to represent the storm!
+       const numMonsters = Math.max(12, Math.floor((2 * Math.PI * safeZoneRadius * TILE_SIZE) / 30));
+       const time = Date.now();
        
-       // Fill outer area with red tint
-       ctx.fillStyle = 'rgba(255, 0, 0, 0.15)';
+       ctx.save();
+       // Fill outer area with red tint (storm area)
+       ctx.fillStyle = 'rgba(100, 0, 0, 0.4)';
        ctx.beginPath();
        ctx.rect(0, 0, canvasWidth, canvasHeight);
        ctx.arc(cx, cy, safeZoneRadius * TILE_SIZE, 0, Math.PI * 2, true);
        ctx.fill();
-       
        ctx.restore();
+       
+       for (let i = 0; i < numMonsters; i++) {
+           const angle = (i / numMonsters) * Math.PI * 2 + (time / 10000); // slow rotation
+           const mx = cx + Math.cos(angle) * safeZoneRadius * TILE_SIZE;
+           const my = cy + Math.sin(angle) * safeZoneRadius * TILE_SIZE;
+           
+           // Only draw if inside screen bounds
+           if (mx > -50 && mx < canvasWidth + 50 && my > -50 && my < canvasHeight + 50) {
+               // Determine direction based on angle (facing inward)
+               let dir = Direction.SOUTH;
+               const inwardAngle = (angle + Math.PI) % (Math.PI * 2);
+               if (inwardAngle > Math.PI * 1.75 || inwardAngle <= Math.PI * 0.25) dir = Direction.EAST;
+               else if (inwardAngle > Math.PI * 0.25 && Math.PI * 0.75 >= inwardAngle) dir = Direction.SOUTH;
+               else if (inwardAngle > Math.PI * 0.75 && Math.PI * 1.25 >= inwardAngle) dir = Direction.WEST;
+               else dir = Direction.NORTH;
+               
+               // Random bobbing effect
+               const bobY = Math.sin(time / 200 + i) * 3;
+               drawMonsterCreature(ctx, 'wraith', mx, my + bobY, dir);
+           }
+       }
     }
 
     // Draw dropped loot (chests)
@@ -2718,6 +2736,35 @@ export default function GameCanvas() {
       ctx.fillText('🛡️ SAFE', canvasWidth / 2 + 1, 36);
       ctx.fillStyle = '#2ecc71';
       ctx.fillText('🛡️ SAFE', canvasWidth / 2, 35);
+    }
+    
+    // VICTORY SCREEN OVERLAY
+    if (useGameStore.getState().matchPhase === 'ended' && currentPlayer.health > 0) {
+      const victoryTime = Date.now() / 1000; // use time for animation
+      // White Flash Effect fading out
+      // Actually we don't know exactly when it ended, so just a permanent golden glow
+      ctx.fillStyle = 'rgba(255, 215, 0, 0.2)';
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+      
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(0, canvasHeight / 2 - 60, canvasWidth, 120);
+      
+      ctx.font = 'bold 48px serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#f1c40f';
+      ctx.shadowColor = '#d35400';
+      ctx.shadowBlur = 20;
+      const scale = 1 + Math.sin(victoryTime * 2) * 0.05;
+      ctx.save();
+      ctx.translate(canvasWidth / 2, canvasHeight / 2 - 10);
+      ctx.scale(scale, scale);
+      ctx.fillText('🏆 VICTORY 🏆', 0, 0);
+      ctx.restore();
+      ctx.shadowBlur = 0;
+      
+      ctx.font = '20px sans-serif';
+      ctx.fillStyle = '#fff';
+      ctx.fillText('You are the Last One Standing!', canvasWidth / 2, canvasHeight / 2 + 30);
     }
     } catch (e: any) {
       const canvas = canvasRef.current;

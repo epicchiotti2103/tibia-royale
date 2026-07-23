@@ -323,13 +323,19 @@ export const useGameStore = create<GameState>((set, get) => ({
               if (dist > newRadius + 2) {
                   // Real damage to player every tick (approx 3 damage per second)
                   if (Math.random() < 0.02) {
-                      addDamageNumber(player.position, 5, 'damage');
-                      set(state => ({
-                          player: state.player ? {
-                              ...state.player,
-                              stats: { ...state.player.stats, health: state.player.stats.health - 5 }
-                          } : null
-                      }));
+                      addDamageNumber(player.position, 15, 'damage');
+                      get().addSpellEffect({ type: 'sword_slash', position: { ...player.position }, direction: player.direction, color: '#333', startTime: Date.now(), duration: 300 });
+                      
+                      set(state => {
+                          const newHealth = state.player!.stats.health - 15;
+                          if (newHealth <= 0) setTimeout(() => state.playerDeath(), 0);
+                          return {
+                              player: state.player ? {
+                                  ...state.player,
+                                  stats: { ...state.player.stats, health: Math.max(0, newHealth) }
+                              } : null
+                          };
+                      });
                   }
               }
           }
