@@ -2545,6 +2545,10 @@ export default function GameCanvas() {
         const glowPhase = (Date.now() % 2000) / 2000;
         const radius = (TILE_SIZE / 2) + Math.sin(glowPhase * Math.PI * 2) * 4;
         
+        const itemDef = ITEMS[loot.itemId];
+        const icon = itemDef ? itemDef.icon : '📦';
+        const color = itemDef ? itemDef.color : '#f1c40f';
+        
         ctx.save();
         ctx.beginPath();
         ctx.arc(screenX + TILE_SIZE / 2, screenY + TILE_SIZE / 2, radius, 0, Math.PI * 2);
@@ -2553,17 +2557,27 @@ export default function GameCanvas() {
           screenX + TILE_SIZE / 2, screenY + TILE_SIZE / 2, 0,
           screenX + TILE_SIZE / 2, screenY + TILE_SIZE / 2, radius
         );
-        grad.addColorStop(0, 'rgba(255, 215, 0, 0.4)'); // Gold glow
-        grad.addColorStop(1, 'rgba(255, 215, 0, 0)');
+        
+        // Convert hex color to rgba for gradient
+        // Assuming hex format #RRGGBB
+        let r = 255, g = 215, b = 0;
+        if (color.startsWith('#') && color.length === 7) {
+            r = parseInt(color.slice(1, 3), 16);
+            g = parseInt(color.slice(3, 5), 16);
+            b = parseInt(color.slice(5, 7), 16);
+        }
+        
+        grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.5)`);
+        grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
         
         ctx.fillStyle = grad;
         ctx.fill();
         
-        // Chest icon
+        // Chest/Item icon
         ctx.font = `${TILE_SIZE * 0.7}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('📦', screenX + TILE_SIZE / 2, screenY + TILE_SIZE / 2 + 2);
+        ctx.fillText(icon, screenX + TILE_SIZE / 2, screenY + TILE_SIZE / 2 + 2);
         
         ctx.restore();
       }
