@@ -729,7 +729,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   updateMonsters: (deltaTime) => {
-    const { monsters, player, gameMap, addDamageNumber, addChatMessage } = get();
+    const { monsters, bots, player, gameMap, addDamageNumber, addChatMessage } = get();
     if (!player) return;
 
     const now = Date.now();
