@@ -1,84 +1,92 @@
-# Tibia Royale - Developer Documentation
+# Tibia Royale - Documentação do Desenvolvedor
 
-Welcome to the **Tibia Royale** codebase! This document outlines the core architecture, gameplay mechanics, and technical details to ensure anyone (or any AI) can easily understand and maintain this project without losing context.
+Bem-vindo ao repositório do **Tibia Royale**! Este documento descreve a arquitetura principal, mecânicas de jogo e detalhes técnicos para garantir que qualquer desenvolvedor (ou IA) consiga entender e continuar o projeto sem perder o contexto.
 
-## 🏗️ Architecture Overview
+## 🏗️ Visão Geral da Arquitetura
 
-The game is built using:
-- **Frontend Framework:** Next.js (React)
-- **Styling:** TailwindCSS
-- **State Management:** Zustand (`src/store/game-store.ts`)
-- **Graphics/Rendering:** HTML5 Canvas (`src/components/game/GameCanvas.tsx`) combined with React components for UI overlays.
-- **Backend/Storage:** SQLite via Next.js API Routes (`src/app/api/...`) for persistent character saving.
+O jogo é construído usando as seguintes tecnologias:
+- **Framework Frontend:** Next.js (React)
+- **Estilização:** TailwindCSS
+- **Gerenciamento de Estado:** Zustand (`src/store/game-store.ts`)
+- **Renderização / Gráficos:** HTML5 Canvas (`src/components/game/GameCanvas.tsx`) combinado com componentes React para as interfaces (HUD, Inventário).
+- **Backend/Armazenamento:** Next.js API Routes (`src/app/api/...`) com Prisma/SQLite para o salvamento e carregamento persistente do personagem (stats, inventário, ouro).
 
-All core logic runs on the client side at 60 FPS via a `requestAnimationFrame` loop that triggers the `updateMatchTimer` inside `game-store.ts`.
-
----
-
-## 🎮 Game Phases
-
-The match revolves around a Battle Royale flow consisting of 3 distinct phases:
-
-1. **Hunting Phase (3 minutes):**
-   - Players and bots roam the map freely.
-   - Objective: Kill monsters, collect loot, gain XP, and level up.
-   - PvP is enabled outside the safe zone (Town).
-2. **Preparation Phase (40 seconds):**
-   - All surviving bots and the player are teleported to the Town center.
-   - Bots instantly level up to match the Player's level (+/- 2 levels) so they are always a challenge.
-   - Players can use their Gold to buy equipment and potions from the Merchant NPC.
-3. **Arena Phase (3 minutes):**
-   - Bots and Player are scattered randomly across the outer edges of the map.
-   - A shrinking Safe Zone (storm) begins closing in on the Town (center of map).
-   - Anyone outside the Safe Zone takes constant true damage.
-   - Last man standing wins!
+Toda a lógica central do jogo (Game Loop) roda no Client-Side através de um `setInterval` atrelado ao `requestAnimationFrame` que atualiza a física, movimentação e combate dentro do `game-store.ts`.
 
 ---
 
-## ⚔️ Combat & Balancing (Crucial Details)
+## 🎮 Fases da Partida (Game Loop)
 
-To ensure combat feels fair and dynamic, we have specific PvP (Player vs Player/Bot) multipliers:
+A partida funciona como um Battle Royale com elementos de RPG, dividida em 3 fases:
 
-- **PvP Spell Damage:** Spells cast by the Player against Bots (or vice versa) have their damage **reduced by 65%** (a 0.35x multiplier). This prevents high-level players from one-shotting bots with area spells.
-- **Bot Melee/Basic Attack Damage:** Bots deal **250% damage** (2.5x multiplier) with their basic physical attacks. This compensates for the fact that bots don't always cast spells.
-- **Natural Regeneration:** Every ~1.5 seconds, all living entities (Player and Bots) naturally regenerate **1% Max HP and 3% Max Mana**.
+1. **Fase de Caçada (Hunting - PvE) (3 minutos):**
+   - Jogadores e Bots andam livremente pelo mapa.
+   - **Objetivo:** Matar monstros, coletar *loot* no chão (itens), ganhar XP e subir de level.
+   - PvP é ativado fora da Cidade (Safe Zone).
 
-### Vocations & Stats (`src/lib/game/types.ts` & `skills.ts`)
-- **Knight:** High HP (18/level), Defense. Low magic. Melee range. Spellcast chance: 10% - 30%.
-- **Paladin:** Balanced HP/Mana, Range 4 basic attack. Spellcast chance: 30% - 60%.
-- **Sorcerer:** High Mana (35/level), high Magic Attack. Low HP. Spellcast chance: 50% - 90%.
-- **Druid:** Healing focused, strong Magic Attack (base 25, +14/lvl). Has early attack spells (Ice Strike Nv1, Earth Strike Nv8). Spellcast chance: 50% - 90%.
+2. **Fase de Preparação (Preparation) (40 segundos):**
+   - Todos os bots sobreviventes e o jogador são teleportados para o centro da Cidade.
+   - Os Bots sofrem "Upgrade" instantâneo para se equipararem ao level atual do jogador, garantindo o desafio na fase final.
+   - O jogador deve usar esse tempo para comprar equipamentos e poções no NPC Mercador usando o Ouro coletado.
 
----
-
-## 🤖 Bot Artificial Intelligence
-
-The Bot AI logic lives inside `src/store/game-store.ts` (`updateBots` function) and `src/lib/game/bots.ts`.
-
-- **Spawning:** Bots are generated with random names, vocations, and playstyles (looter, aggressive, cautious).
-- **Spellcasting:** Bots have a dynamic `spellCastChance` (based on vocation). When attacking, they roll this chance to cast a random offensive spell from their class list instead of basic attacking. They must have sufficient mana.
-- **Pathfinding & Collision:** Bots move towards targets (Loot, Monsters, Players). If an obstacle (Wall, Water) blocks their direct diagonal/straight path, the AI attempts to "slide" alongside the wall via orthogonal movements.
-- **Safe Zone Escape:** During the Arena phase, bots prioritize moving towards coordinate (50, 50) if they are outside the safe zone ring.
-- **Healing:** Bots will instantly heal themselves if their HP drops below their `fleeThreshold` (using a 5-second cooldown internal heal).
+3. **Fase de Arena (Battle Royale - PvP) (3 minutos):**
+   - Bots e o Jogador são espalhados nas bordas do mapa.
+   - Uma **Tempestade (Círculo de Shadow Wraiths)** começa a fechar em direção ao centro. Ficar de fora causa dano real e contínuo.
+   - O último sobrevivente ganha a partida.
 
 ---
 
-## 🗺️ Map & Sprites
+## 🤖 Inteligência Artificial (Bots) - Detalhes
 
-- **Tilemap (`src/lib/game/tilemap.ts`):** 
-  - The map is a grid of tiles (0: Grass, 2: Water, 4: Sand, 7: Wall, etc.).
-  - The "Town" (Safe Zone) is defined statically as `x: 35, y: 35, w: 30, h: 25`. PvP damage is completely blocked if either the attacker or defender is in this box.
-- **Sprites (`public/sprites/`):**
-  - All player, bot, and monster graphics use directional sprites (`north.png`, `south.png`, `east.png`, `west.png`).
-  - Preloaded dynamically in `GameCanvas.tsx` using an `Image()` caching system to avoid flicker.
+A IA dos bots evoluiu para se comportar como jogadores reais de Tibia. A lógica vive no arquivo `src/lib/game/bots.ts` e na função `updateBots` de `src/store/game-store.ts`.
+
+1. **Oportunismo (Third-Partying):**
+   - Na Arena, ao invés de atacar apenas o alvo mais próximo fisicamente, os bots calculam a "Distância Percebida" baseada no HP do alvo. Se um inimigo estiver com 10% de HP, o bot ignorará um alvo full-life ao lado dele para finalizar o alvo fraco e roubar o loot.
+
+2. **Uso de Poções Limitadas (Sobrevivência):**
+   - Bots não têm vida infinita. Cada bot spawna com 2 a 5 **Poções de Vida**. Se o HP cair para menos de 40%, eles usam uma poção instantaneamente (com 2s de cooldown), subindo 30% da vida, até o estoque acabar.
+
+3. **Combos Mágicos:**
+   - Bots atacam fisicamente, mas também rolam um dado (`spellCastChance`) a cada ataque. Vocações mágicas (Sorcerers) rolam de 50-90% de chance de soltar uma magia *junto* com o hit físico, gastando mana real para dar *burst damage*.
+
+4. **Colisão Real:**
+   - Foi implementado o sistema `isOccupied`. Bots, Monstros e Jogador são sólidos. Não é possível andar por cima de outros personagens vivos. A IA desvia automaticamente se bater de frente com outro bot.
 
 ---
 
-## 🛠️ How to Add or Modify Content
+## ⚔️ Combate e Balanceamento
 
-1. **Add a New Spell:** Edit `src/lib/game/skills.ts`. Add the spell definition, configure `vocation`, `levelReq`, and damage/heal values. Then add the visual effect string to `getSkillEffectType()`.
-2. **Add a New Monster:** Edit `src/lib/game/monsters.ts`. Define stats, loot tables, and `sprites` paths.
-3. **Add New Items:** Edit `src/lib/game/items.ts`. Configure the slot it occupies (head, chest, legs, weapon) and the stat bonuses (`armor`, `magicPower`, etc.).
+- **Dano PvP de Magias:** Magias lançadas contra jogadores/bots têm o dano **reduzido em 65%** (`0.35x` multiplier) para evitar *one-shots* de habilidades em área de high-levels.
+- **Dano Físico Bot:** Ataques básicos dos Bots causam **250%** de dano (`2.5x` multiplier) para compensar a falta de precisão cirúrgica de um jogador humano.
+- **Regeneração:** A cada ~1.5 segundos, todos os seres vivos recuperam 1% Max HP e 3% Max Mana.
+
+### Vocações (`src/lib/game/types.ts`)
+- **Knight:** Tank focado em vida (18/lvl) e porrada (Melee range).
+- **Paladin:** Focado em distância (Range 4). Ataca de longe e pode usar pequenas magias.
+- **Sorcerer:** Focado em Dano Mágico (Range 5). Pouca vida, muita mana (35/lvl), alto uso de magias.
+- **Druid:** Focado em Suporte e Magias (Ice/Earth), uso intenso de combos mágicos.
 
 ---
-*Generated and maintained by Antigravity AI.*
+
+## 📱 Controles Mobile e Multi-Touch
+
+- **Joystick e Botões (`MobileControls.tsx`):**
+  - O sistema usa a API `onPointerDown` no lugar de `onClick` ou `onTouchStart`. Isso garante suporte a **Multi-touch**.
+  - O jogador pode segurar o direcional com o dedão esquerdo e "metralhar" as Hotkeys (Ataque, Poção, Magias) ou itens no **Inventário** com o dedo direito sem que o toque seja cancelado.
+- **Layout Responsivo (`GameHUD.tsx`):**
+  - O HUD é dimensionado (`scale-90`) em telas pequenas para evitar sobreposição (overlap) com os painéis de Inventário e Joystick.
+  - A caixa de "Quick Stats" fica oculta em celulares na tela principal; o jogador deve abrir o menu do Inventário para ver seu Atk/Def atual.
+
+---
+
+## 🛠️ Como Adicionar Conteúdo Novo
+
+1. **Novos Itens (`src/lib/game/items.ts`):**
+   - Adicione o objeto definindo os status (`attack`, `defense`), o ícone em texto e o slot (`weapon`, `chest`).
+2. **Novas Magias (`src/lib/game/skills.ts`):**
+   - Defina o dano, custo de mana e vocação. Modifique a renderização gráfica (cor e tipo) em `GameCanvas.tsx`.
+3. **Novos Monstros (`src/lib/game/monsters.ts`):**
+   - Defina HP, Drop Rate de items, sprites e experiência dada.
+
+---
+*Atualizado por Antigravity AI.*
