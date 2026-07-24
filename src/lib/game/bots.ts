@@ -18,6 +18,7 @@ export interface BotInstance {
   spellCastChance: number; // dynamically assigned based on vocation
   lastHealTime?: number;
   isLooter: boolean;
+  potionsLeft: number;
 }
 
 const BOT_NAMES = [
@@ -71,7 +72,8 @@ export function generateBots(count: number, spawnPoint: Position, riskyRatio: nu
       huntingRisk: Math.random() < riskyRatio ? 'risky' : 'safe',
       attackRange,
       spellCastChance,
-      isLooter: Math.random() < looterRatio
+      isLooter: Math.random() < looterRatio,
+      potionsLeft: 2 + Math.floor(Math.random() * 4) // 2 to 5 potions
     });
   }
 

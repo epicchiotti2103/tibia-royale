@@ -519,14 +519,21 @@ export const useGameStore = create<GameState>((set, get) => ({
           if (matchPhase === 'arena') {
              if (player && player.stats.health > 0) {
                  const dist = Math.abs(player.position.x - bot.position.x) + Math.abs(player.position.y - bot.position.y);
+                 // Opportunism: Target with less health is more attractive (pseudo-distance reduction)
+                 const hpFactor = player.stats.health / Math.max(1, player.stats.maxHealth);
+                 const perceivedDist = dist + (hpFactor * 20); // If 100% HP, adds 20. If 10% HP, adds 2.
+                 
                  closestTarget = { id: 'player', x: player.position.x, y: player.position.y, type: 'player' };
-                 minDistance = dist;
+                 minDistance = perceivedDist;
              }
              for (const otherBot of bots) {
                  if (otherBot.id === bot.id) continue;
                  const dist = Math.abs(otherBot.position.x - bot.position.x) + Math.abs(otherBot.position.y - bot.position.y);
-                 if (dist < minDistance) {
-                     minDistance = dist;
+                 const hpFactor = otherBot.stats.health / Math.max(1, otherBot.stats.maxHealth);
+                 const perceivedDist = dist + (hpFactor * 20);
+                 
+                 if (perceivedDist < minDistance) {
+                     minDistance = perceivedDist;
                      closestTarget = { id: otherBot.id, x: otherBot.position.x, y: otherBot.position.y, type: 'bot' };
                  }
              }
@@ -598,6 +605,29 @@ export const useGameStore = create<GameState>((set, get) => ({
                          newBot.lastMoveTime = now;
                          botUpdated = true;
                      }
+                  }
+              }
+
+              // Potion Logic (Survival)
+              if (bot.potionsLeft > 0 && bot.stats.health < bot.stats.maxHealth * 0.4) {
+                  const timeSinceHeal = now - (bot.lastHealTime || 0);
+                  if (timeSinceHeal > 2000) { // 2s cooldown on potions
+                      bot.potionsLeft--;
+                      newBot.potionsLeft = bot.potionsLeft;
+                      newBot.lastHealTime = now;
+                      const healAmount = Math.floor(bot.stats.maxHealth * 0.3); // heal 30%
+                      newBot.stats.health = Math.min(bot.stats.maxHealth, bot.stats.health + healAmount);
+                      
+                      get().addSpellEffect({
+                          type: 'heal',
+                          position: { ...bot.position },
+                          direction: bot.direction,
+                          color: '#2ecc71',
+                          startTime: now,
+                          duration: 500
+                      });
+                      get().addDamageNumber(bot.position, healAmount, 'heal');
+                      botUpdated = true;
                   }
               }
 
