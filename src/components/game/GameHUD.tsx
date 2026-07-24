@@ -76,13 +76,13 @@ export default function GameHUD() {
       {/* Top bar - Character Info */}
       <div className="flex items-start justify-between p-2 gap-2 mt-1">
         {/* Character panel - includes time */}
-        <div className="bg-black/80 border border-amber-700/50 rounded-lg p-2 pointer-events-auto min-w-[200px]">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded bg-amber-700 flex items-center justify-center text-white text-sm font-bold">
+        <div className="bg-black/80 border border-amber-700/50 rounded-lg p-1.5 md:p-2 pointer-events-auto min-w-[160px] md:min-w-[200px] scale-90 md:scale-100 origin-top-left">
+          <div className="flex items-center gap-2 mb-1.5 md:mb-2">
+            <div className="w-6 h-6 md:w-8 md:h-8 rounded bg-amber-700 flex items-center justify-center text-white text-xs md:text-sm font-bold">
               {player.vocation[0]}
             </div>
             <div className="flex-1">
-              <div className="text-amber-400 font-bold text-sm leading-tight">{player.name}</div>
+              <div className="text-amber-400 font-bold text-xs md:text-sm leading-tight">{player.name}</div>
               <div className="text-amber-200/60 text-xs">
                 {player.vocation} • Lv.{stats.level}
               </div>
@@ -146,8 +146,8 @@ export default function GameHUD() {
           </div>
         </div>
 
-        {/* Quick Stats - compact */}
-        <div className="bg-black/80 border border-amber-700/50 rounded-lg p-2 pointer-events-auto text-[10px] md:text-xs">
+        {/* Quick Stats - compact (hidden on mobile to save space) */}
+        <div className="hidden md:block bg-black/80 border border-amber-700/50 rounded-lg p-2 pointer-events-auto text-[10px] md:text-xs">
           <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-gray-300">
             <div>⚔️ Atk: <span className="text-orange-400 font-bold">{totalAttack}</span></div>
             <div>🛡️ Def: <span className="text-gray-200 font-bold">{totalDefense}</span></div>

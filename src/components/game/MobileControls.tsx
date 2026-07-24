@@ -13,8 +13,8 @@ interface MobileControlsProps {
   touchAttack: React.MutableRefObject<boolean>;
 }
 
-const JOYSTICK_SIZE = 120;
-const KNOB_SIZE = 44;
+const JOYSTICK_SIZE = 90;
+const KNOB_SIZE = 36;
 const JOYSTICK_RADIUS = (JOYSTICK_SIZE - KNOB_SIZE) / 2;
 const DEADZONE = 10;
 
@@ -354,12 +354,13 @@ export function MobileControls({ touchDirection, touchAttack }: MobileControlsPr
         overflow: 'hidden',
       }}
     >
-      {/* Secondary actions — top area, away from combat cluster */}
+      {/* Secondary actions — bottom center, away from HUD and Joystick */}
       <div
         style={{
           position: 'absolute',
-          top: 'calc(20px + env(safe-area-inset-top))',
-          left: 'calc(230px + env(safe-area-inset-left))',
+          bottom: 'calc(20px + env(safe-area-inset-bottom))',
+          left: '50%',
+          transform: 'translateX(-50%)',
           display: 'flex',
           gap: 12,
           pointerEvents: 'auto',
