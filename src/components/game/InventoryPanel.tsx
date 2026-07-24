@@ -95,7 +95,8 @@ export default function InventoryPanel() {
                   return (
                     <button
                       key={invItem.id}
-                      onClick={() => {
+                      onPointerDown={(e) => {
+                        e.preventDefault(); // prevent default to ensure multi-touch reliability
                         if (itemDef.type === ItemType.CONSUMABLE) consumeInventoryItem(invItem.id);
                         else equipItem(invItem.id);
                       }}
@@ -131,7 +132,10 @@ export default function InventoryPanel() {
                   return (
                     <div
                       key={slot}
-                      onClick={() => equippedId && unequipItem(slot)}
+                      onPointerDown={(e) => {
+                          e.preventDefault();
+                          if (equippedId) unequipItem(slot);
+                      }}
                       className="flex items-center gap-3 p-2 bg-gray-800 rounded-lg cursor-pointer active:bg-gray-700 border border-gray-700"
                     >
                       <span className="text-xs font-bold text-gray-400 w-16">{SLOT_LABELS[slot].split(' ')[1]}</span>
