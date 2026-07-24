@@ -376,7 +376,10 @@ export function MobileControls({ touchDirection, touchAttack }: MobileControlsPr
         <button
           type="button"
           aria-label="Use Potion"
-          onClick={quickUsePotion}
+          onPointerDown={(e) => {
+             e.preventDefault();
+             quickUsePotion();
+          }}
           style={{
             position: 'absolute',
             right: 'calc(40px + env(safe-area-inset-right))',

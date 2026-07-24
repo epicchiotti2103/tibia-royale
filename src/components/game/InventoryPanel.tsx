@@ -160,7 +160,7 @@ export default function InventoryPanel() {
 
   // Render Desktop Version
   return (
-    <div className={`absolute top-12 right-0 z-20 ${isOpen ? 'w-72' : ''}`}>
+    <div className={`absolute top-28 right-0 z-20 ${isOpen ? 'w-72' : ''}`}>
       <button
         onClick={() => setIsDesktopOpen(!isOpen)}
         className="bg-black/80 border border-amber-700/50 rounded-t-lg px-3 py-1 text-amber-400 text-xs font-bold hover:bg-black/90"
